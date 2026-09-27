@@ -325,4 +325,17 @@
     <string name="ignore_ad_calls">Игнорировать рекламные вызовы</string>
     <string name="ignore_analytics">Игнорировать аналитику</string>
     <string name="option_not_available">Вам недоступна данная опция</string>
+    <string name="locale_bho">Бходжпури</string>
+    <string name="locale_ceb">Себуано</string>
+    <string name="locale_ckb">Центральнокурдский (сорани)</string>
+    <string name="locale_doi">Догри</string>
+    <string name="locale_fil">Филиппинский</string>
+    <string name="locale_haw">Гавайский</string>
+    <string name="locale_hmn">Хмонг</string>
+    <string name="locale_ilo">Илоканский</string>
+    <string name="locale_jw">Яванский</string>
+    <string name="locale_kri">Крио</string>
+    <string name="locale_lus">Мизо (лушай)</string>
+    <string name="locale_mai">Майтхили</string>
+    <string name="locale_nso">Северный сото (сепеди)</string>
 </resources>

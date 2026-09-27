@@ -487,20 +487,40 @@ class PatchActivity : AppCompatActivity() {
         dialog?.show()
     }
 
+    private val extraLocaleNames = mapOf(
+        "bho" to R.string.locale_bho,
+        "ceb" to R.string.locale_ceb,
+        "ckb" to R.string.locale_ckb,
+        "doi" to R.string.locale_doi,
+        "fil" to R.string.locale_fil,
+        "haw" to R.string.locale_haw,
+        "hmn" to R.string.locale_hmn,
+        "ilo" to R.string.locale_ilo,
+        "jw" to R.string.locale_jw,
+        "kri" to R.string.locale_kri,
+        "lus" to R.string.locale_lus,
+        "mai" to R.string.locale_mai,
+        "nso" to R.string.locale_nso
+    )
+
     private fun getLocaleDisplayName(qualifier: String): String {
+        val clean = qualifier.trimStart('-')
+        val lang = if (clean.startsWith("b+")) {
+            clean.split('+').getOrNull(1) ?: ""
+        } else {
+            clean.split('-').firstOrNull() ?: ""
+        }
+        extraLocaleNames[lang]?.let { return "${getString(it)} $qualifier" }
         return try {
-            val clean = qualifier.trimStart('-')
             if (clean.startsWith("b+")) {
                 val parts = clean.split('+')
                 if (parts.size >= 2) {
-                    val lang = parts[1]
-                    val locale = java.util.Locale(lang)
+                    val locale = java.util.Locale(parts[1])
                     val displayName = locale.getDisplayLanguage(java.util.Locale.getDefault()).replaceFirstChar { it.uppercase() }
                     "$displayName $qualifier"
                 } else qualifier
             } else {
                 val parts = clean.split('-')
-                val lang = parts[0]
                 val country = when {
                     parts.size > 1 && parts[1].startsWith("r") && parts[1].length == 3 -> parts[1].substring(1)
                     parts.size > 1 && parts[1].length == 2 -> parts[1]

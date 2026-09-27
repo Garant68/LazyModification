@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.lazymodification"
         minSdk = 21
         targetSdk = 35
-        versionCode = 120
-        versionName = "1.20"
+        versionCode = 121
+        versionName = "1.21"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

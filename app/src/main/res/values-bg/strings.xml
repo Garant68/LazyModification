@@ -319,4 +319,17 @@
     <string name="ignore_ad_calls">Игнорирай рекламните извиквания</string>
     <string name="ignore_analytics">Игнорирай аналитиката</string>
     <string name="option_not_available">Тази опция не е достъпна за вас</string>
+    <string name="locale_bho">Бходжпури</string>
+    <string name="locale_ceb">Себуано</string>
+    <string name="locale_ckb">Централен кюрдски (сорани)</string>
+    <string name="locale_doi">Догри</string>
+    <string name="locale_fil">Филипински</string>
+    <string name="locale_haw">Хавайски</string>
+    <string name="locale_hmn">Хмонг</string>
+    <string name="locale_ilo">Илокански</string>
+    <string name="locale_jw">Явански</string>
+    <string name="locale_kri">Крио</string>
+    <string name="locale_lus">Мизо (лушай)</string>
+    <string name="locale_mai">Майтхили</string>
+    <string name="locale_nso">Северен сото (сепеди)</string>
 </resources>

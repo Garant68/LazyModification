@@ -327,4 +327,17 @@
     <string name="ignore_ad_calls">Ignore ad calls</string>
     <string name="ignore_analytics">Ignore analytics</string>
     <string name="option_not_available">This option is not available to you</string>
+    <string name="locale_bho">Bhojpuri</string>
+    <string name="locale_ceb">Cebuano</string>
+    <string name="locale_ckb">Central Kurdish (Sorani)</string>
+    <string name="locale_doi">Dogri</string>
+    <string name="locale_fil">Filipino</string>
+    <string name="locale_haw">Hawaiian</string>
+    <string name="locale_hmn">Hmong</string>
+    <string name="locale_ilo">Ilocano</string>
+    <string name="locale_jw">Javanese</string>
+    <string name="locale_kri">Krio</string>
+    <string name="locale_lus">Mizo (Lushai)</string>
+    <string name="locale_mai">Maithili</string>
+    <string name="locale_nso">Northern Sotho (Sepedi)</string>
 </resources>
