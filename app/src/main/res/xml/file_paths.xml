@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Внешнее хранилище (Download, DCIM и т.д.) -->
+    <external-path
+        name="external_files"
+        path="." />
+
+    <!-- Внутренний кэш приложения -->
+    <cache-path
+        name="cache"
+        path="." />
+
+    <!-- Внутренние файлы приложения -->
+    <files-path
+        name="internal_files"
+        path="." />
+
+    <!-- Внешний кэш -->
+    <external-cache-path
+        name="external_cache"
+        path="." />
+
+    <!-- Внешние файлы приложения -->
+    <external-files-path
+        name="external_files_app"
+        path="." />
+</paths>

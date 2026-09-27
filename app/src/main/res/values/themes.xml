@@ -1,0 +1,71 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- БАЗОВАЯ СВЕТЛАЯ ТЕМА -->
+    <style name="Base.Theme.LazyModification" parent="Theme.Material3.Light.NoActionBar">
+        <!-- ✅ Основной цвет кнопок и акцентов -->
+        <item name="colorPrimary">#596487</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">#DCE1F0</item>
+        <item name="colorOnPrimaryContainer">#152040</item>
+        <item name="colorPrimaryInverse">#B9C3E4</item>
+
+        <!-- ✅ Вторичный цвет -->
+        <item name="colorSecondary">#596487</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="colorSecondaryContainer">#DCE1F0</item>
+        <item name="colorOnSecondaryContainer">#152040</item>
+
+        <!-- ✅ Третичный цвет -->
+        <item name="colorTertiary">#6E5A87</item>
+        <item name="colorOnTertiary">#FFFFFF</item>
+        <item name="colorTertiaryContainer">#F0DCE1</item>
+        <item name="colorOnTertiaryContainer">#401520</item>
+
+        <!-- ❌ Цвет ошибки -->
+        <item name="colorError">#BA1A1A</item>
+        <item name="colorOnError">#FFFFFF</item>
+        <item name="colorErrorContainer">#FFDAD6</item>
+        <item name="colorOnErrorContainer">#410002</item>
+
+        <!-- 🎨 Фон и поверхности -->
+        <item name="android:colorBackground">#F5F5F8</item>
+        <item name="colorSurface">#F5F5F8</item>
+        <item name="colorOnSurface">#1C1B1F</item>
+        <item name="colorSurfaceVariant">#E1E2EC</item>
+        <item name="colorOnSurfaceVariant">#44474F</item>
+        <item name="colorSurfaceInverse">#313033</item>
+        <item name="colorOnSurfaceInverse">#F4EFF4</item>
+
+        <!-- 📏 Контур -->
+        <item name="colorOutline">#74777F</item>
+        <item name="colorOutlineVariant">#C4C6D0</item>
+
+        <!-- 🌈 Статус-бар и навигация -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+
+        <!-- ✅ ПРИМЕНЯЕМ СТИЛИ ДЛЯ КНОПОК -->
+        <item name="materialButtonStyle">@style/Widget.LazyModification.Button</item>
+        <item name="materialButtonOutlinedStyle">@style/Widget.LazyModification.Button.Outlined</item>
+    </style>
+
+    <style name="Theme.LazyModification" parent="Base.Theme.LazyModification" />
+
+    <!-- ✅ СТИЛЬ ДЛЯ ОБЫЧНЫХ КНОПОК -->
+    <style name="Widget.LazyModification.Button" parent="Widget.Material3.Button">
+        <item name="backgroundTint">#596487</item>
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="iconTint">#FFFFFF</item>
+        <item name="rippleColor">#33FFFFFF</item>
+        <item name="cornerRadius">12dp</item>
+    </style>
+
+    <!-- ✅ СТИЛЬ ДЛЯ OUTLINED КНОПОК -->
+    <style name="Widget.LazyModification.Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="strokeColor">#596487</item>
+        <item name="android:textColor">#596487</item>
+        <item name="iconTint">#596487</item>
+        <item name="rippleColor">#1F596487</item>
+        <item name="cornerRadius">12dp</item>
+    </style>
+</resources>
