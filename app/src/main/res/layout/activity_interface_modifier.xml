@@ -116,7 +116,7 @@
     <!-- ProgressBar и статус теперь находятся внутри отдельного контейнера -->
     <LinearLayout
         android:id="@+id/llProgressContainer"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:gravity="center"
@@ -125,7 +125,9 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toTopOf="@id/btnApply"
-        android:layout_marginTop="32dp">
+        android:layout_marginTop="32dp"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp">
 
         <ProgressBar
             android:id="@+id/progressBar"
@@ -134,10 +136,10 @@
 
         <TextView
             android:id="@+id/tvStatus"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text=""
-            android:textSize="14sp"
+            android:textSize="16sp"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:gravity="center"
             android:layout_marginTop="16dp"/>

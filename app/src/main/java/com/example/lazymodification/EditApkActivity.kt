@@ -5,6 +5,7 @@ import com.example.lazymodification.utils.FileSaver
 import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
@@ -23,6 +24,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.example.lazymodification.utils.SignatureConfig
+import com.example.lazymodification.utils.IconReplacer
 import com.example.lazymodification.utils.SigningUtils
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
@@ -60,6 +62,7 @@ class EditApkActivity : AppCompatActivity() {
     private lateinit var apkPath: String
 
     private var selectedBannerPath: String? = null
+    private var selectedIconPath: String? = null
     private var currentAppName = ""
     private var currentVersion = ""
     private var currentVersionCode = ""
@@ -124,6 +127,29 @@ class EditApkActivity : AppCompatActivity() {
         }
     }
 
+    // Тап по иконке: выбираем новую картинку (как в ApkEditor / APKTool M)
+    private val pickIconLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val path = result.data?.getStringExtra(FileBrowserActivity.EXTRA_SELECTED_PATH)
+            val lower = path?.lowercase() ?: ""
+            if (path != null && (lower.endsWith(".png") || lower.endsWith(".webp") ||
+                        lower.endsWith(".jpg") || lower.endsWith(".jpeg"))) {
+                selectedIconPath = path
+                try {
+                    val opts = BitmapFactory.Options()
+                    opts.inSampleSize = 4
+                    ivAppIcon.setImageBitmap(BitmapFactory.decodeFile(path, opts))
+                } catch (_: Exception) { }
+                checkModified()
+                Toast.makeText(this, getString(R.string.icon_selected), Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, getString(R.string.choose_png_file), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ThemeHelper.apply(this)
@@ -158,6 +184,14 @@ class EditApkActivity : AppCompatActivity() {
         }
 
         btnSave.setOnClickListener { showSigningDialog() }
+
+        ivAppIcon.setOnClickListener {
+            pickIconLauncher.launch(
+                Intent(this, FileBrowserActivity::class.java).apply {
+                    putExtra(FileBrowserActivity.EXTRA_FILE_MODE, FileBrowserActivity.MODE_IMAGE)
+                }
+            )
+        }
 
         cbRemoveInternet.setOnCheckedChangeListener { _, isChecked ->
             isRemoveInternet = isChecked; checkModified()
@@ -271,7 +305,7 @@ class EditApkActivity : AppCompatActivity() {
                 currentMinSdk != originalMinSdk ||
                 currentTargetSdk != originalTargetSdk ||
                 isRemoveInternet || isDisableDirectBoot || isDisableBootCompleted ||
-                isFixGoogleMaps || cbConvertAtv.isChecked
+                isFixGoogleMaps || cbConvertAtv.isChecked || selectedIconPath != null
         btnSave.isEnabled = isModified
         btnSave.visibility = if (isModified) View.VISIBLE else View.GONE
     }
@@ -457,6 +491,17 @@ class EditApkActivity : AppCompatActivity() {
                 parser.setInput(StringReader(xmlContent))
                 manifest.parse(parser)
 
+                if (selectedIconPath != null) {
+                    try {
+                        val iconFile = File(selectedIconPath!!)
+                        if (iconFile.exists()) {
+                            IconReplacer.replaceIcon(apkModule, iconFile) { msg -> Log.d(TAG, msg) }
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Ошибка замены иконки", e)
+                    }
+                }
+
                 val tempModified = File(cacheDir, "temp_edit_modified.apk")
                 tempModified.delete()
                 apkModule.writeApk(tempModified)
@@ -510,6 +555,7 @@ class EditApkActivity : AppCompatActivity() {
                     isModified = false
                     cbConvertAtv.isChecked = false
                     selectedBannerPath = null
+                    selectedIconPath = null
                     Toast.makeText(
                         this,
                         getString(R.string.saved_success, outputName, signInfo, SaveFolderHelper.getLocationLabel(this)),

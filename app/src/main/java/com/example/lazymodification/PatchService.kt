@@ -37,6 +37,7 @@ class PatchService : Service() {
         const val EXTRA_PATCH_REMOVE_GP_SERVICES = "patch_remove_gp_services"
         const val EXTRA_PATCH_REMOVE_VPN = "patch_remove_vpn"
         const val EXTRA_PATCH_REMOVE_INSTALLER_CHECK = "patch_remove_installer_check"
+        const val EXTRA_PATCH_REMOVE_UPDATE = "patch_remove_update"
         const val EXTRA_PATCH_REMOVE_LOCALES = "patch_remove_locales"
         const val EXTRA_PATCH_REMOVE_LOCALES_LIST = "patch_remove_locales_list"
         const val EXTRA_PATCH_REMOVE_DPI = "patch_remove_dpi"
@@ -105,6 +106,7 @@ class PatchService : Service() {
         val patchRemoveGPServices = intent?.getBooleanExtra(EXTRA_PATCH_REMOVE_GP_SERVICES, false) ?: false
         val patchRemoveVpn = intent?.getBooleanExtra(EXTRA_PATCH_REMOVE_VPN, false) ?: false
         val patchRemoveInstallerCheck = intent?.getBooleanExtra(EXTRA_PATCH_REMOVE_INSTALLER_CHECK, false) ?: false
+        val patchRemoveUpdate = intent?.getBooleanExtra(EXTRA_PATCH_REMOVE_UPDATE, false) ?: false
         val patchRemoveLocales = intent?.getBooleanExtra(EXTRA_PATCH_REMOVE_LOCALES, false) ?: false
         val localesToRemove = intent?.getStringArrayListExtra(EXTRA_PATCH_REMOVE_LOCALES_LIST)
         val patchRemoveDpi = intent?.getBooleanExtra(EXTRA_PATCH_REMOVE_DPI, false) ?: false
@@ -142,6 +144,7 @@ class PatchService : Service() {
                     File(apkPath),
                     patchGooglePlay, patchRemoveAds, patchRemoveAnalytics,
                     patchRemoveGPServices, patchRemoveVpn, patchRemoveInstallerCheck,
+                    patchRemoveUpdate,
                     patchRemoveLocales, localesToRemove,
                     patchRemoveDpi, dpisToRemove,
                     patchRemoveLibs, libsToRemove,
@@ -152,6 +155,9 @@ class PatchService : Service() {
                 Log.e(TAG, "❌ OutOfMemoryError", e)
                 sendLog(getString(R.string.oom_file_too_large), "ERROR")
             } catch (e: Exception) {
+                Log.e(TAG, getString(R.string.error), e)
+                sendLog(getString(R.string.error_with_msg, e.message), "ERROR")
+            } catch (e: Throwable) {
                 Log.e(TAG, getString(R.string.error), e)
                 sendLog(getString(R.string.error_with_msg, e.message), "ERROR")
             } finally {
@@ -214,6 +220,7 @@ class PatchService : Service() {
         apkFile: File,
         patchGooglePlay: Boolean, patchRemoveAds: Boolean, patchRemoveAnalytics: Boolean,
         patchRemoveGPServices: Boolean, patchRemoveVpn: Boolean, patchRemoveInstallerCheck: Boolean,
+        patchRemoveUpdate: Boolean,
         patchRemoveLocales: Boolean, localesToRemove: List<String>?,
         patchRemoveDpi: Boolean, dpisToRemove: List<String>?,
         patchRemoveLibs: Boolean, libsToRemove: List<String>?,
@@ -238,6 +245,7 @@ class PatchService : Service() {
         val workDir = File(cacheDir, "patch_${System.currentTimeMillis()}")
         workDir.mkdirs()
 
+        var anyApplied = false
         try {
             sendLog(getString(R.string.status_copying_apk), "INFO")
             var workingApk = File(workDir, apkFile.name)
@@ -253,6 +261,7 @@ class PatchService : Service() {
                     if (manifestCount > 0) {
                         manifestPatchedApk.copyTo(workingApk, overwrite = true)
                         sendLog(getString(R.string.log_manifest_removed, manifestCount), "SUCCESS")
+                        anyApplied = true
                     } else {
                         sendLog(getString(R.string.manifest_nothing_found), "WARNING")
                     }
@@ -272,6 +281,7 @@ class PatchService : Service() {
                     if (removedCount > 0) {
                         noLocalesApk.copyTo(workingApk, overwrite = true)
                         sendLog(getString(R.string.log_locales_removed, removedCount), "SUCCESS")
+                        anyApplied = true
                     } else {
                         sendLog(getString(R.string.locales_not_found), "WARNING")
                     }
@@ -294,6 +304,7 @@ class PatchService : Service() {
                         if (removedCount > 0) {
                             noDpiApk.copyTo(workingApk, overwrite = true)
                             sendLog(getString(R.string.log_dpi_removed, removedCount), "SUCCESS")
+                            anyApplied = true
                         } else {
                             sendLog(getString(R.string.dpi_files_not_found), "WARNING")
                         }
@@ -317,6 +328,7 @@ class PatchService : Service() {
                         if (removedCount > 0) {
                             noLibsApk.copyTo(workingApk, overwrite = true)
                             sendLog(getString(R.string.log_libs_removed, removedCount), "SUCCESS")
+                            anyApplied = true
                         } else {
                             sendLog(getString(R.string.libs_not_found), "WARNING")
                         }
@@ -330,7 +342,7 @@ class PatchService : Service() {
             }
 
             val needsDexPatching = patchGooglePlay || patchRemoveAds || patchRemoveAnalytics ||
-                    patchRemoveGPServices || patchRemoveVpn || patchRemoveInstallerCheck || patchOptimize
+                    patchRemoveGPServices || patchRemoveVpn || patchRemoveInstallerCheck || patchRemoveUpdate || patchOptimize
 
             if (needsDexPatching) {
                 sendLog(getString(R.string.status_extracting_dex), "INFO")
@@ -342,7 +354,7 @@ class PatchService : Service() {
 
                 val patchedDexMap = HashMap<String, File>()
                 var totalGP = 0; var totalAds = 0; var totalAnalytics = 0
-                var totalGPServices = 0; var totalVpn = 0; var totalInstallerCheck = 0; var totalDebug = 0
+                var totalGPServices = 0; var totalVpn = 0; var totalInstallerCheck = 0; var totalDebug = 0; var totalUpdate = 0
 
                 val dexCount = dexFiles.size
                 val progressPerDex = if (dexCount > 0) 50.0 / dexCount else 0.0
@@ -358,7 +370,8 @@ class PatchService : Service() {
                             inputDex = dex, outputDex = patchedDex,
                             patchGooglePlay = patchGooglePlay, patchRemoveAds = patchRemoveAds,
                             patchRemoveAnalytics = patchRemoveAnalytics, patchRemoveGPServices = patchRemoveGPServices,
-                            patchRemoveVpn = patchRemoveVpn, patchRemoveInstallerCheck = patchRemoveInstallerCheck, patchRemoveDebug = true
+                            patchRemoveVpn = patchRemoveVpn, patchRemoveInstallerCheck = patchRemoveInstallerCheck, patchRemoveDebug = true,
+                            patchRemoveUpdate = patchRemoveUpdate
                         )
 
                         totalGP += result.googlePlayPatched
@@ -368,11 +381,12 @@ class PatchService : Service() {
                         totalVpn += result.vpnPatched
                         totalInstallerCheck += result.installerCheckPatched
                         totalDebug += result.debugItemsRemoved
+                        totalUpdate += result.updateCheckPatched
 
                         patchedDexMap[dex.name] = patchedDex
 
                         val elapsed = System.currentTimeMillis() - dexStart
-                        sendLog("  GP:${result.googlePlayPatched} Ads:${result.adsPatched} Analytics:${result.analyticsPatched} GP_Svc:${result.gpServicesPatched} VPN:${result.vpnPatched} Installer:${result.installerCheckPatched} Debug:${result.debugItemsRemoved} (${elapsed}ms)", "INFO")
+                        sendLog("  GP:${result.googlePlayPatched} Ads:${result.adsPatched} Analytics:${result.analyticsPatched} GP_Svc:${result.gpServicesPatched} VPN:${result.vpnPatched} Installer:${result.installerCheckPatched} Update:${result.updateCheckPatched} Debug:${result.debugItemsRemoved} (${elapsed}ms)", "INFO")
                     } catch (e: OutOfMemoryError) {
                         sendLog(getString(R.string.log_oom_dex, dex.name, dexSizeMb), "ERROR")
                         throw e
@@ -385,13 +399,21 @@ class PatchService : Service() {
                     sendProgress((21 + progressPerDex * (i + 1)).toInt().coerceAtMost(71))
                 }
 
+                if (totalGP + totalAds + totalAnalytics + totalGPServices + totalVpn + totalInstallerCheck > 0) anyApplied = true
                 if (patchGooglePlay) sendLog("✅ Google Play: $totalGP", if (totalGP > 0) "SUCCESS" else "WARNING")
                 if (patchRemoveAds) sendLog(getString(R.string.log_ads, totalAds), if (totalAds > 0) "SUCCESS" else "WARNING")
                 if (patchRemoveAnalytics) sendLog(getString(R.string.log_analytics, totalAnalytics), if (totalAnalytics > 0) "SUCCESS" else "WARNING")
                 if (patchRemoveGPServices) sendLog(getString(R.string.log_gp_services, totalGPServices), if (totalGPServices > 0) "SUCCESS" else "WARNING")
                 if (patchRemoveVpn) sendLog("✅ VPN Detection: $totalVpn", if (totalVpn > 0) "SUCCESS" else "WARNING")
                 if (patchRemoveInstallerCheck) sendLog("✅ Installer check: $totalInstallerCheck", if (totalInstallerCheck > 0) "SUCCESS" else "WARNING")
+                if (patchRemoveUpdate) sendLog(getString(R.string.log_update_check, totalUpdate), if (totalUpdate > 0) "SUCCESS" else "WARNING")
                 sendLog(getString(R.string.log_debug, totalDebug), if (totalDebug > 0) "SUCCESS" else "INFO")
+
+                if (patchRemoveUpdate && totalUpdate == 0 && !anyApplied && !patchOptimize) {
+                    sendLog(getString(R.string.log_update_not_found_norebuild), "WARNING")
+                    sendProgress(0)
+                    return
+                }
 
                 sendLog(getString(R.string.status_repacking), "INFO")
                 val repackedApk = File(workDir, "repacked.apk")
@@ -425,6 +447,7 @@ class PatchService : Service() {
                 sendProgress(80)
 
                 if (patchOptimize) {
+                    anyApplied = true
                     sendLog("📦 Оптимизация (сжатие)...", "INFO")
                     val optimizedApk = File(workDir, "optimized.apk")
                     try {
@@ -651,7 +674,7 @@ class PatchService : Service() {
             } finally {
                 apkModule.close()
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "ARSCLib failed", e)
             input.copyTo(output, overwrite = true)
         }

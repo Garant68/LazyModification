@@ -332,4 +332,44 @@
     <string name="locale_lus">Мизо (лушай)</string>
     <string name="locale_mai">Майтхили</string>
     <string name="locale_nso">Северен сото (сепеди)</string>
-</resources>
+    <string name="err_app_flutter">Това е приложение с Flutter (Dart): менюто се изгражда в кода — автоматическото премахване на елементи е невъзможно.</string>
+    <string name="err_app_compose">Това е приложение с Jetpack Compose: елементите се изграждат в код — автоматическото премахване е невъзможно.</string>    <string name="translate_app_button">Превод на приложението</string>
+    <string name="translator_label">Преводач:</string>
+    <string name="translator_google">Google</string>
+    <string name="translator_mymemory">MyMemory</string>
+    <string name="translator_azure">Azure Translator</string>
+    <string name="translator_deepl">DeepL Free</string>
+    <string name="azure_key_hint">Ключ за Azure Translator</string>
+    <string name="azure_region_hint">Регион Azure (напр. westeurope)</string>
+    <string name="deepl_key_hint">Ключ за DeepL</string>
+    <string name="start_translate">Започни превод</string>
+    <string name="status_preparing_strings">Подготовка на низове…</string>
+    <string name="status_translating">Превод: %1$d от %2$d…</string>
+    <string name="translations_preview">Преглед: %1$d низа</string>
+    <string name="apply_translations">Приложи превода</string>
+    <string name="err_translator_key_required">Въведете ключ за избрания преводач</string>
+    <string name="err_translate_empty">Няма намерени низове за превод</string>
+    <string name="err_translate_failed">Грешка при превод: %1$s</string>
+    <string name="translations_applied">✅ Преводите са приложени (руска локализация)</string>
+    <string name="status_translations_write">Записване на руска локализация…</string>
+    <string name="preview_truncated">…показани първите %1$d низа</string>    <string name="translations_edit_hint">Преводите могат да се редактират директно в списъка</string>    <string name="mode_label">Режим:</string>
+    <string name="mode_fast">Бърз превод</string>
+    <string name="mode_full">Пълен превод</string>
+    <string name="fast_strings_hint">Низове за превод, разделени със запетая</string>
+    <string name="fast_strings_note">Със запетая. Преводач: MyMemory.</string>
+    <string name="fast_translate_action">Преведи</string>
+    <string name="err_fast_empty">Въведете низове за превод, разделени със запетая</string>
+    <string name="msg_strings_not_found">Не са намерени в ресурсите (пропуснати): %1$s</string>    <string name="inspector_title">Инспектор на APK</string>
+    <string name="insp_type_normal">✔ Обикновено приложение — всички инструменти са налични</string>
+    <string name="insp_type_compose">⚠ Jetpack Compose — скриването на елементи не е налично</string>
+    <string name="insp_type_flutter">⚠ Flutter (Dart) — скриването на елементи не е налично</string>
+    <string name="insp_ads">💰 Реклама: %1$s</string>
+    <string name="insp_analytics">📊 Аналитика: %1$s</string>
+    <string name="insp_none">не е намерена</string>
+    <string name="insp_locales">🌍 Езици (%1$d): %2$s</string>
+    <string name="insp_ru_yes">✔ руски има — превод не е нужен</string>
+    <string name="insp_ru_no">✖ няма руски — може да се преведе (Превод на приложението)</string>
+    <string name="insp_found">🎯 Намерено: %1$s</string>
+    <string name="insp_found_none">🎯 Нищо типично не е намерено</string>    <string name="remove_update_check">Премахни проверката за обновление (Play, RuStore)</string>
+    <string name="log_update_check">🔓 Проверка за обновление (Play): %1$d</string>
+    <string name="log_update_not_found_norebuild">❌ Проверката за обновление (Play) не е намерена — файлът не беше пресглобен</string>    <string name="insp_update_check">🔔 Проверка за обновление: %1$s</string></resources>

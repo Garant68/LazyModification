@@ -340,4 +340,44 @@
     <string name="locale_lus">Mizo (Lushai)</string>
     <string name="locale_mai">Maithili</string>
     <string name="locale_nso">Northern Sotho (Sepedi)</string>
-</resources>
+    <string name="err_app_flutter">This is a Flutter (Dart) app: the menu is built in code — automatic item removal is not possible.</string>
+    <string name="err_app_compose">This is a Jetpack Compose app: items are built in code — automatic removal is not possible.</string>    <string name="translate_app_button">Translate app</string>
+    <string name="translator_label">Translator:</string>
+    <string name="translator_google">Google</string>
+    <string name="translator_mymemory">MyMemory</string>
+    <string name="translator_azure">Azure Translator</string>
+    <string name="translator_deepl">DeepL Free</string>
+    <string name="azure_key_hint">Azure Translator key</string>
+    <string name="azure_region_hint">Azure region (e.g. westeurope)</string>
+    <string name="deepl_key_hint">DeepL key</string>
+    <string name="start_translate">Start translation</string>
+    <string name="status_preparing_strings">Preparing strings…</string>
+    <string name="status_translating">Translating: %1$d of %2$d…</string>
+    <string name="translations_preview">Preview: %1$d strings</string>
+    <string name="apply_translations">Apply translation</string>
+    <string name="err_translator_key_required">Enter the key for the selected translator</string>
+    <string name="err_translate_empty">No strings found to translate</string>
+    <string name="err_translate_failed">Translation error: %1$s</string>
+    <string name="translations_applied">✅ Translations applied (Russian locale)</string>
+    <string name="status_translations_write">Writing Russian locale…</string>
+    <string name="preview_truncated">…showing first %1$d strings</string>    <string name="translations_edit_hint">You can edit translations directly in the list</string>    <string name="mode_label">Mode:</string>
+    <string name="mode_fast">Quick translation</string>
+    <string name="mode_full">Full translation</string>
+    <string name="fast_strings_hint">Strings to translate, comma-separated</string>
+    <string name="fast_strings_note">Comma-separated. Translator: MyMemory.</string>
+    <string name="fast_translate_action">Translate</string>
+    <string name="err_fast_empty">Enter strings to translate, comma-separated</string>
+    <string name="msg_strings_not_found">Not found in app resources (skipped): %1$s</string>    <string name="inspector_title">APK Inspector</string>
+    <string name="insp_type_normal">✔ Standard app — all tools available</string>
+    <string name="insp_type_compose">⚠ Jetpack Compose — menu item hiding is not available</string>
+    <string name="insp_type_flutter">⚠ Flutter (Dart) — menu item hiding is not available</string>
+    <string name="insp_ads">💰 Ads: %1$s</string>
+    <string name="insp_analytics">📊 Analytics: %1$s</string>
+    <string name="insp_none">none found</string>
+    <string name="insp_locales">🌍 Languages (%1$d): %2$s</string>
+    <string name="insp_ru_yes">✔ Russian present — translation not needed</string>
+    <string name="insp_ru_no">✖ No Russian — you can translate (Translate app)</string>
+    <string name="insp_found">🎯 Found: %1$s</string>
+    <string name="insp_found_none">🎯 Nothing typical found</string>    <string name="remove_update_check">Remove update check (Play, RuStore)</string>
+    <string name="log_update_check">🔓 Update check (Play): %1$d</string>
+    <string name="log_update_not_found_norebuild">❌ Update check (Play) not found — the file was not rebuilt</string>    <string name="insp_update_check">🔔 Update check: %1$s</string></resources>

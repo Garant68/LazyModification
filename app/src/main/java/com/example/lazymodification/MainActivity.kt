@@ -94,8 +94,8 @@ class MainActivity : AppCompatActivity() {
             if (path != null) {
                 val file = File(path)
                 if (file.exists()) {
-                    startActivity(Intent(this, InterfaceModifierActivity::class.java).apply {
-                        putExtra(InterfaceModifierActivity.EXTRA_APK_PATH, path)
+                    startActivity(Intent(this, InterfaceToolsActivity::class.java).apply {
+                        putExtra(InterfaceToolsActivity.EXTRA_APK_PATH, path)
                     })
                 } else {
                     Toast.makeText(this, getString(R.string.file_not_found), Toast.LENGTH_SHORT).show()

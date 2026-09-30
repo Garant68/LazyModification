@@ -29,9 +29,13 @@ import java.io.File
 class InterfaceModifierActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_APK_PATH = "com.example.lazymodification.INTERFACE_APK_PATH"
+        const val EXTRA_MODE = "com.example.lazymodification.INTERFACE_MODE"
+        const val MODE_MENU = "menu"
+        const val MODE_MARQUEE = "marquee"
         private const val TAG = "InterfaceModifier"
     }
 
+    private lateinit var tvTitle: TextView
     private lateinit var tvFileName: TextView
     private lateinit var cbRemoveMenu: CheckBox
     private lateinit var cbMarquee: CheckBox
@@ -109,6 +113,7 @@ class InterfaceModifierActivity : AppCompatActivity() {
         ThemeHelper.apply(this)
         setContentView(R.layout.activity_interface_modifier)
 
+        tvTitle = findViewById(R.id.tvTitle)
         tvFileName = findViewById(R.id.tvFileName)
         cbRemoveMenu = findViewById(R.id.cbRemoveMenu)
         cbMarquee = findViewById(R.id.cbMarquee)
@@ -179,6 +184,21 @@ class InterfaceModifierActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
             showSigningDialog(itemsToRemove)
+        }
+
+        when (intent.getStringExtra(EXTRA_MODE)) {
+            MODE_MENU -> {
+                tvTitle.text = getString(R.string.remove_menu_items)
+                cbMarquee.visibility = View.GONE
+                cbRemoveMenu.isChecked = true
+                cbRemoveMenu.visibility = View.GONE
+            }
+            MODE_MARQUEE -> {
+                tvTitle.text = getString(R.string.insert_marquee)
+                cbRemoveMenu.visibility = View.GONE
+                cbMarquee.isChecked = true
+                cbMarquee.visibility = View.GONE
+            }
         }
     }
 
@@ -442,6 +462,7 @@ class InterfaceModifierActivity : AppCompatActivity() {
                         outputFile = tempOutput,
                         menuItems = itemsToRemove,
                         onStatus = { status -> runOnUiThread { tvStatus.text = status } },
+                        helperDex = runCatching { assets.open("preffix.dex").use { it.readBytes() } }.getOrNull(),
                     )
 
                     if (!tempOutput.exists() || tempOutput.length() == 0L) {
@@ -506,8 +527,14 @@ class InterfaceModifierActivity : AppCompatActivity() {
                     btnApply.visibility = View.VISIBLE
                     btnApply.isEnabled = true
                     isProcessing = false
-                    tvStatus.text = getString(R.string.error_with_msg, e.message)
-                    Toast.makeText(this, getString(R.string.error_with_msg, e.message), Toast.LENGTH_LONG).show()
+                    val errText = if (e is InterfaceModifier.UnsupportedAppType) getString(e.resId) else (e.message ?: "")
+                    tvStatus.text = getString(R.string.error_with_msg, errText)
+                    // Диалог вместо Toast: висит, пока пользователь сам не закроет — текст успеешь прочитать
+                    AlertDialog.Builder(this)
+                        .setTitle(R.string.error)
+                        .setMessage(errText)
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show()
                 }
             }
         }.start()

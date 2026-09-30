@@ -18,7 +18,9 @@
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
 
-    <application
+        <uses-permission android:name="android.permission.INTERNET"/>
+
+<application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -50,6 +52,8 @@
         <activity android:name=".CloneApkActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
         <activity android:name=".CloneFileBrowserActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
         <activity android:name=".InterfaceModifierActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
+    <activity android:name=".InterfaceToolsActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
+    <activity android:name=".TranslateAppActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
     <activity android:name=".CompareApkActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />    <activity android:name=".CompareFileActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
 
         <service

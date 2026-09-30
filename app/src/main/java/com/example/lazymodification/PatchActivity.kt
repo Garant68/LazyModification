@@ -7,12 +7,14 @@ import android.view.Gravity
 import android.view.View
 import android.widget.CheckBox
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.example.lazymodification.utils.ApkInspector
 import com.example.lazymodification.utils.DexPatcher
 import com.example.lazymodification.utils.DpiRemove
 import com.example.lazymodification.utils.SignatureConfig
@@ -35,10 +37,14 @@ class PatchActivity : AppCompatActivity() {
     private lateinit var checkBoxRemoveGPServices: CheckBox
     private lateinit var checkBoxRemoveVpn: CheckBox
     private lateinit var checkBoxRemoveInstallerCheck: CheckBox
+    private lateinit var checkBoxRemoveUpdate: CheckBox
     private lateinit var checkBoxRemoveLocales: CheckBox
     private lateinit var checkBoxRemoveDpi: CheckBox
     private lateinit var checkBoxRemoveLibs: CheckBox
     private lateinit var checkBoxOptimize: CheckBox
+    private lateinit var checkBoxInspector: CheckBox
+    private var isInspecting = false
+    private var inspectorProgress: AlertDialog? = null
     private lateinit var btnPatch: MaterialButton
     private var apkPath: String? = null
     private var availableLocales: List<String> = emptyList()
@@ -89,10 +95,12 @@ class PatchActivity : AppCompatActivity() {
         checkBoxRemoveGPServices = findViewById(R.id.checkBoxRemoveGPServices)
         checkBoxRemoveVpn = findViewById(R.id.checkBoxRemoveVpn)
         checkBoxRemoveInstallerCheck = findViewById(R.id.checkBoxRemoveInstallerCheck)
+        checkBoxRemoveUpdate = findViewById(R.id.checkBoxRemoveUpdate)
         checkBoxRemoveLocales = findViewById(R.id.checkBoxRemoveLocales)
         checkBoxRemoveDpi = findViewById(R.id.checkBoxRemoveDpi)
         checkBoxRemoveLibs = findViewById(R.id.checkBoxRemoveLibs)
         checkBoxOptimize = findViewById(R.id.checkBoxOptimize)
+        checkBoxInspector = findViewById(R.id.checkBoxInspector)
         btnPatch = findViewById(R.id.btnPatch)
 
         apkPath = intent.getStringExtra(EXTRA_APK_PATH)
@@ -113,7 +121,13 @@ class PatchActivity : AppCompatActivity() {
         preloadDpis()
         preloadArchs()
         setupCheckboxes()
-        btnPatch.setOnClickListener { showSigningDialog() }
+        btnPatch.setOnClickListener {
+            if (otherPatchesSelected()) {
+                showSigningDialog()
+            } else {
+                runInspector()
+            }
+        }
     }
 
     private fun preloadLocales() {
@@ -124,7 +138,7 @@ class PatchActivity : AppCompatActivity() {
                     availableLocales = locales
                     Log.d(TAG, "🌍 Найдено языков: ${locales.size}")
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.e(TAG, "Ошибка чтения локалей", e)
             }
         }.start()
@@ -138,7 +152,7 @@ class PatchActivity : AppCompatActivity() {
                     availableDpis = dpis
                     Log.d(TAG, "📱 Найдено DPI: ${dpis.size}")
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.e(TAG, "Ошибка чтения DPI", e)
             }
         }.start()
@@ -152,7 +166,7 @@ class PatchActivity : AppCompatActivity() {
                     availableArchs = archs
                     Log.d(TAG, "🏗️ Найдено архитектур: ${archs.size}")
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.e(TAG, "Ошибка чтения архитектур", e)
             }
         }.start()
@@ -193,10 +207,17 @@ class PatchActivity : AppCompatActivity() {
         checkBoxRemoveGPServices.setOnCheckedChangeListener(listener)
         checkBoxRemoveVpn.setOnCheckedChangeListener(listener)
         checkBoxRemoveInstallerCheck.setOnCheckedChangeListener(listener)
+        checkBoxRemoveUpdate.setOnCheckedChangeListener(listener)
         checkBoxRemoveLocales.setOnCheckedChangeListener(listener)
         checkBoxRemoveDpi.setOnCheckedChangeListener(listener)
         checkBoxRemoveLibs.setOnCheckedChangeListener(listener)
         checkBoxOptimize.setOnCheckedChangeListener(listener)
+        checkBoxInspector.setOnCheckedChangeListener { _, isChecked ->
+            updatePatchButtonState()
+            if (isChecked) {
+                runInspector()
+            }
+        }
     }
 
     private fun handleLibsCheckbox(isChecked: Boolean) {
@@ -334,8 +355,9 @@ class PatchActivity : AppCompatActivity() {
     private fun updatePatchButtonState() {
         val any = checkBoxGooglePlay.isChecked || checkBoxRemoveAds.isChecked ||
                 checkBoxRemoveAnalytics.isChecked || checkBoxRemoveGPServices.isChecked ||
-                checkBoxRemoveVpn.isChecked || checkBoxRemoveInstallerCheck.isChecked || checkBoxRemoveLocales.isChecked ||
-                checkBoxRemoveDpi.isChecked || checkBoxRemoveLibs.isChecked || checkBoxOptimize.isChecked
+                checkBoxRemoveVpn.isChecked || checkBoxRemoveInstallerCheck.isChecked || checkBoxRemoveUpdate.isChecked || checkBoxRemoveLocales.isChecked ||
+                checkBoxRemoveDpi.isChecked || checkBoxRemoveLibs.isChecked || checkBoxOptimize.isChecked ||
+                checkBoxInspector.isChecked
         btnPatch.isEnabled = any
         btnPatch.visibility = if (any) View.VISIBLE else View.GONE
     }
@@ -536,6 +558,72 @@ class PatchActivity : AppCompatActivity() {
         } catch (e: Exception) { qualifier }
     }
 
+    /** Инспектор APK: читающий анализ, показать отчёт. Если выбраны и патчи — продолжить после отчёта. */
+    private fun runInspector() {
+        val path = apkPath ?: return
+        if (isInspecting) return
+        isInspecting = true
+        btnPatch.isEnabled = false
+
+        val ll = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(64, 40, 64, 24)
+            gravity = Gravity.CENTER
+        }
+        ll.addView(ProgressBar(this))
+        ll.addView(TextView(this).apply {
+            text = getString(R.string.inspector_title) + "…"
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setPadding(0, 32, 0, 0)
+        })
+        inspectorProgress = AlertDialog.Builder(this).setView(ll).setCancelable(false).create()
+        inspectorProgress?.show()
+
+        Thread {
+            try {
+                val report = ApkInspector.inspect(this, File(path))
+                runOnUiThread {
+                    inspectorProgress?.dismiss(); inspectorProgress = null
+                    isInspecting = false
+                    updatePatchButtonState()
+                    showInspectorReport(report)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "inspector error", e)
+                runOnUiThread {
+                    inspectorProgress?.dismiss(); inspectorProgress = null
+                    isInspecting = false
+                    updatePatchButtonState()
+                    Toast.makeText(this, getString(R.string.error_msg_plain, e.message), Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
+    }
+
+    private fun otherPatchesSelected(): Boolean {
+        return checkBoxGooglePlay.isChecked || checkBoxRemoveAds.isChecked ||
+                checkBoxRemoveAnalytics.isChecked || checkBoxRemoveGPServices.isChecked ||
+                checkBoxRemoveVpn.isChecked || checkBoxRemoveInstallerCheck.isChecked ||
+                checkBoxRemoveLocales.isChecked || checkBoxRemoveDpi.isChecked ||
+                checkBoxRemoveLibs.isChecked || checkBoxOptimize.isChecked
+    }
+
+    private fun showInspectorReport(report: String) {
+        val tv = TextView(this).apply {
+            text = report
+            textSize = 14f
+            setPadding(48, 24, 48, 24)
+        }
+        val sv = ScrollView(this).apply { addView(tv) }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.inspector_title)
+            .setView(sv)
+            .setPositiveButton(android.R.string.ok, null)
+            .create()
+            .show()
+    }
+
     private fun showSigningDialog() {
         pendingSignConfirm = { config -> startPatching(config) }
         SigningUtils.resolveSigningConfig(
@@ -558,6 +646,7 @@ class PatchActivity : AppCompatActivity() {
             putExtra(PatchService.EXTRA_PATCH_REMOVE_GP_SERVICES, checkBoxRemoveGPServices.isChecked)
             putExtra(PatchService.EXTRA_PATCH_REMOVE_VPN, checkBoxRemoveVpn.isChecked)
             putExtra(PatchService.EXTRA_PATCH_REMOVE_INSTALLER_CHECK, checkBoxRemoveInstallerCheck.isChecked)
+            putExtra(PatchService.EXTRA_PATCH_REMOVE_UPDATE, checkBoxRemoveUpdate.isChecked)
             putExtra(PatchService.EXTRA_PATCH_REMOVE_LOCALES, checkBoxRemoveLocales.isChecked)
             putStringArrayListExtra(PatchService.EXTRA_PATCH_REMOVE_LOCALES_LIST, ArrayList(selectedLocales))
             putExtra(PatchService.EXTRA_PATCH_REMOVE_DPI, checkBoxRemoveDpi.isChecked)

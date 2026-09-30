@@ -42,7 +42,8 @@ data class PatchResult(
     val installerCheckPatched: Int = 0,
     val debugItemsRemoved: Int = 0,
     val manifestPatched: Int = 0,
-    val signaturePatched: Int = 0  // ✅ НОВОЕ
+    val signaturePatched: Int = 0,  // ✅ НОВОЕ
+    val updateCheckPatched: Int = 0  // Play In-App Updates
 ) {
     val analyticsPatched: Int get() = analyticsUrlPatched + analyticsFieldPatched
 }
@@ -234,7 +235,8 @@ object DexPatcher {
         patchGooglePlay: Boolean = false, patchRemoveAds: Boolean = false,
         patchRemoveAnalytics: Boolean = false, patchRemoveGPServices: Boolean = false,
         patchRemoveVpn: Boolean = false, patchRemoveInstallerCheck: Boolean = false, patchRemoveDebug: Boolean = false,
-        patchRemoveSignature: Boolean = false  // ✅ НОВОЕ
+        patchRemoveSignature: Boolean = false,  // ✅ НОВОЕ
+        patchRemoveUpdate: Boolean = false  // Play In-App Updates
     ): PatchResult {
         val opcodes = Opcodes.forApi(28)
         val dex = DexFileFactory.loadDexFile(inputDex, opcodes)
@@ -243,6 +245,7 @@ object DexPatcher {
         var caAppPubCount = 0; var analyticsUrlCount = 0; var analyticsFieldCount = 0
         var gpServicesCount = 0; var vpnCount = 0; var installerCheckCount = 0; var debugItemsCount = 0
         var signatureCount = 0  // ✅ НОВОЕ
+        var updateCount = 0
 
         val startTime = System.currentTimeMillis()
         android.util.Log.d(TAG, "🔍 DEX: ${inputDex.name}, GP=$patchGooglePlay, Ads=$patchRemoveAds, Analytics=$patchRemoveAnalytics, GP_Svc=$patchRemoveGPServices, VPN=$patchRemoveVpn, Debug=$patchRemoveDebug, Sign=$patchRemoveSignature")
@@ -254,27 +257,146 @@ object DexPatcher {
                 } else classDef.staticFields
 
                 val directMethods = classDef.directMethods.map { method ->
-                    patchMethod(method, patchGooglePlay, patchRemoveAds, patchRemoveAnalytics, patchRemoveGPServices, patchRemoveVpn, patchRemoveInstallerCheck, patchRemoveDebug, patchRemoveSignature,
+                    patchMethod(method, patchGooglePlay, patchRemoveAds, patchRemoveAnalytics, patchRemoveGPServices, patchRemoveVpn, patchRemoveInstallerCheck, patchRemoveDebug, patchRemoveSignature, patchRemoveUpdate,
                         { googlePlayCount++ }, { adsCount++ }, { adsBooleanCount++ }, { urlsCount++ }, { caAppPubCount++ },
-                        { analyticsUrlCount++ }, { gpServicesCount++ }, { vpnCount++ }, { installerCheckCount++ }, { debugItemsCount++ }, { signatureCount++ })
+                        { analyticsUrlCount++ }, { gpServicesCount++ }, { vpnCount++ }, { installerCheckCount++ }, { debugItemsCount++ }, { signatureCount++ }, { updateCount++ })
                 }
 
                 val virtualMethods = classDef.virtualMethods.map { method ->
-                    patchMethod(method, patchGooglePlay, patchRemoveAds, patchRemoveAnalytics, patchRemoveGPServices, patchRemoveVpn, patchRemoveInstallerCheck, patchRemoveDebug, patchRemoveSignature,
+                    patchMethod(method, patchGooglePlay, patchRemoveAds, patchRemoveAnalytics, patchRemoveGPServices, patchRemoveVpn, patchRemoveInstallerCheck, patchRemoveDebug, patchRemoveSignature, patchRemoveUpdate,
                         { googlePlayCount++ }, { adsCount++ }, { adsBooleanCount++ }, { urlsCount++ }, { caAppPubCount++ },
-                        { analyticsUrlCount++ }, { gpServicesCount++ }, { vpnCount++ }, { installerCheckCount++ }, { debugItemsCount++ }, { signatureCount++ })
+                        { analyticsUrlCount++ }, { gpServicesCount++ }, { vpnCount++ }, { installerCheckCount++ }, { debugItemsCount++ }, { signatureCount++ }, { updateCount++ })
                 }
 
                 ImmutableClassDef(classDef.type, classDef.accessFlags, classDef.superclass, classDef.interfaces, classDef.sourceFile, classDef.annotations,
                     patchedStaticFields, classDef.instanceFields, directMethods, virtualMethods)
             }
 
-            DexFileFactory.writeDexFile(outputDex.absolutePath, ImmutableDexFile(opcodes, patchedClasses))
+            writeDexWithRepair(outputDex, opcodes, patchedClasses)
             android.util.Log.d(TAG, "📊 GP=$googlePlayCount, Ads(V)=$adsCount, Ads(Z)=$adsBooleanCount, URL=$urlsCount, ca-app-pub=$caAppPubCount, Analytics(URL)=$analyticsUrlCount, Analytics(Field)=$analyticsFieldCount, GP_Svc=$gpServicesCount, VPN=$vpnCount, Sign=$signatureCount, Debug=$debugItemsCount, Time=${System.currentTimeMillis() - startTime}ms")
         } catch (e: Exception) { android.util.Log.e(TAG, "❌ Ошибка: ${e.message}", e); throw e }
 
         return PatchResult(googlePlayCount, adsCount + adsBooleanCount, adsBooleanCount, urlsCount, caAppPubCount,
-            analyticsUrlCount, analyticsFieldCount, gpServicesCount, vpnCount, installerCheckCount, debugItemsCount, 0, signatureCount)
+            analyticsUrlCount, analyticsFieldCount, gpServicesCount, vpnCount, installerCheckCount, debugItemsCount, 0, signatureCount, updateCount)
+    }
+
+    // ============================================================
+    // ✅ АВТО-ПОЧИНКА: методы, которые dexlib2 не может записать
+    // («Exception occurred while writing code_item for method ...» —
+    // например, кривая структура try/catch после R8/bundletool).
+    // Повторяем запись, отбросив таблицу try/catch у проблемного метода.
+    // ============================================================
+    private fun writeDexWithRepair(outputDex: File, opcodes: Opcodes, classes: List<org.jf.dexlib2.iface.ClassDef>) {
+        try {
+            DexFileFactory.writeDexFile(outputDex.absolutePath, ImmutableDexFile(opcodes, classes))
+        } catch (e: Exception) {
+            val msg = e.message ?: ""
+            if (!msg.contains("code_item for method")) throw e
+            val methodDesc = msg.substringAfter("code_item for method ").substringBefore(" ")
+            // Починка 1: отбросить try/catch у проблемного метода
+            val repaired = repairClassList(classes, methodDesc)
+            if (repaired == null) throw e
+            android.util.Log.w(TAG, "♻️ Починка метода $methodDesc: таблица try/catch отброшена")
+            try {
+                DexFileFactory.writeDexFile(outputDex.absolutePath, ImmutableDexFile(opcodes, repaired))
+            } catch (e2: Exception) {
+                val protoStr = findItemNotFound(e2)
+                if (protoStr == null) throw e2
+                // Починка 2: недостающий прото (например, прото invoke-polymorphic,
+                // на который ссылается только эта инструкция) — добавляем
+                // синтетический native-метод с таким прото в первый класс.
+                val fixed = addProtoStub(repaired, protoStr)
+                if (fixed == null) throw e2
+                android.util.Log.w(TAG, "♻️ Добавлен заглушечный прото: $protoStr")
+                DexFileFactory.writeDexFile(outputDex.absolutePath, ImmutableDexFile(opcodes, fixed))
+            }
+        }
+    }
+
+    private fun findItemNotFound(t: Throwable?): String? {
+        var cur = t
+        while (cur != null) {
+            val m = cur.message ?: ""
+            if (m.contains("Item not found.")) {
+                return m.substringAfter("Item not found.: ").substringBefore(" ")
+            }
+            cur = cur.cause
+        }
+        return null
+    }
+
+    private fun addProtoStub(classes: List<org.jf.dexlib2.iface.ClassDef>, protoStr: String): List<org.jf.dexlib2.iface.ClassDef>? {
+        val paren = protoStr.indexOf('(')
+        val close = protoStr.indexOf(')', paren)
+        if (paren < 0 || close < 0) return null
+        val paramTypes = splitParamTypes(protoStr.substring(paren + 1, close))
+        val returnType = protoStr.substring(close + 1)
+        val first = classes.firstOrNull() ?: return null
+        val stub = ImmutableMethod(
+            first.type, "__lm_proto_fix",
+            paramTypes.map { org.jf.dexlib2.immutable.ImmutableMethodParameter(it, mutableSetOf(), null) },
+            returnType,
+            0x8 or 0x100 or 0x1000, // static | native | synthetic
+            null, null, null
+        )
+        val newFirst = ImmutableClassDef(
+            first.type, first.accessFlags, first.superclass, first.interfaces,
+            first.sourceFile, first.annotations, first.staticFields, first.instanceFields,
+            first.directMethods + stub, first.virtualMethods
+        )
+        return classes.map { if (it === first) newFirst else it }
+    }
+
+    private fun repairClassList(classes: List<org.jf.dexlib2.iface.ClassDef>, methodDesc: String): List<org.jf.dexlib2.iface.ClassDef>? {
+        val idx = methodDesc.indexOf(";->")
+        if (idx < 0) return null
+        val className = methodDesc.substring(0, idx) + ";"
+        val rest = methodDesc.substring(idx + 3)
+        val paren = rest.indexOf('(')
+        val close = rest.indexOf(')', paren)
+        if (paren < 0 || close < 0) return null
+        val name = rest.substring(0, paren)
+        val params = splitParamTypes(rest.substring(paren + 1, close))
+        val returnType = rest.substring(close + 1)
+        var found = false
+        val newClasses = classes.map { c ->
+            if (c.type != className) c
+            else ImmutableClassDef(
+                c.type, c.accessFlags, c.superclass, c.interfaces, c.sourceFile, c.annotations,
+                c.staticFields, c.instanceFields,
+                c.directMethods.map { m -> if (!found && matchesMethod(m, name, params, returnType)) { found = true; repairMethod(m) } else m },
+                c.virtualMethods.map { m -> if (!found && matchesMethod(m, name, params, returnType)) { found = true; repairMethod(m) } else m }
+            )
+        }
+        return if (found) newClasses else null
+    }
+
+    private fun matchesMethod(m: org.jf.dexlib2.iface.Method, name: String, params: List<String>, returnType: String): Boolean =
+        m.name == name && m.returnType == returnType && m.parameterTypes.map { it.toString() } == params
+
+    private fun repairMethod(m: org.jf.dexlib2.iface.Method): org.jf.dexlib2.iface.Method {
+        val impl = m.implementation ?: return m
+        val instructions = impl.instructions.toList()
+        val newImpl = ImmutableMethodImplementation(impl.registerCount, instructions, emptyList(), impl.debugItems)
+        return ImmutableMethod(m.definingClass, m.name, m.parameters, m.returnType, m.accessFlags, m.annotations, m.hiddenApiRestrictions, newImpl)
+    }
+
+    private fun splitParamTypes(s: String): List<String> {
+        if (s.isEmpty()) return emptyList()
+        val result = mutableListOf<String>()
+        var i = 0
+        while (i < s.length) {
+            val start = i
+            if (s[i] == '[') {
+                while (i < s.length && s[i] == '[') i++
+                if (i < s.length && s[i] == 'L') { while (i < s.length && s[i] != ';') i++ }
+            } else if (s[i] == 'L') {
+                while (i < s.length && s[i] != ';') i++
+            }
+            i++
+            result.add(s.substring(start, i))
+        }
+        return result
     }
 
     // ============================================================
@@ -403,31 +525,44 @@ fun patchPackageName(inputDex: File, outputDex: File, oldPackage: String, newPac
     // ЛОКАЛИЗАЦИИ
     // ============================================================
     fun readLocalesFromApk(apkFile: File): List<String> {
-        val apkModule = ApkModule.loadApkFile(apkFile)
-        val tableBlock: TableBlock = apkModule.tableBlock
-            ?: throw IllegalStateException("В APK нет resources.arsc")
+        // ВАЖНО: ARSCLib на Android может бросить Error (CoderMalfunctionError) на «битых»
+        // строках ресурсов — ловим Throwable, чтобы не валить приложение.
+        return try {
+            val apkModule = ApkModule.loadApkFile(apkFile)
+            val tableBlock: TableBlock = apkModule.tableBlock
+                ?: throw IllegalStateException("В APK нет resources.arsc")
 
-        val localesSet = linkedSetOf<String>()
+            val localesSet = linkedSetOf<String>()
 
-        for (packageBlock in tableBlock.listPackages()) {
-            for (specTypePair in packageBlock.listSpecTypePairs()) {
-                for (typeBlock in specTypePair) {
-                    val qualifiers = typeBlock.resConfig.qualifiers
-                    if (isLanguageQualifier(qualifiers)) {
-                        localesSet.add(qualifiers)
+            for (packageBlock in tableBlock.listPackages()) {
+                for (specTypePair in packageBlock.listSpecTypePairs()) {
+                    for (typeBlock in specTypePair) {
+                        val qualifiers = typeBlock.resConfig.qualifiers
+                        if (isLanguageQualifier(qualifiers)) {
+                            localesSet.add(qualifiers)
+                        }
                     }
                 }
             }
-        }
 
-        apkModule.close()
-        return localesSet.toList().sorted()
+            apkModule.close()
+            localesSet.toList().sorted()
+        } catch (t: Throwable) {
+            emptyList()
+        }
     }
 
     fun removeLocalesFromApk(inputApk: File, outputApk: File, localesToRemove: List<String>? = null): Int {
-        val apkModule = ApkModule.loadApkFile(inputApk)
-        val tableBlock: TableBlock = apkModule.tableBlock
-            ?: throw IllegalStateException("В APK нет resources.arsc")
+        val apkModule = try {
+            ApkModule.loadApkFile(inputApk)
+        } catch (t: Throwable) {
+            throw IllegalStateException("Не удалось прочитать ресурсы APK: ${t.message}")
+        }
+        val tableBlock: TableBlock = try {
+            apkModule.tableBlock
+        } catch (t: Throwable) {
+            throw IllegalStateException("Не удалось прочитать ресурсы APK: ${t.message}")
+        } ?: throw IllegalStateException("В APK нет resources.arsc")
 
         val safeLocalesToRemove = localesToRemove
             ?.filter { it.isNotEmpty() }
@@ -532,10 +667,11 @@ fun patchPackageName(inputDex: File, outputDex: File, oldPackage: String, newPac
         method: org.jf.dexlib2.iface.Method,
         patchGooglePlay: Boolean, patchRemoveAds: Boolean, patchRemoveAnalytics: Boolean, patchRemoveGPServices: Boolean,
         patchRemoveVpn: Boolean, patchRemoveInstallerCheck: Boolean, patchRemoveDebug: Boolean, patchRemoveSignature: Boolean,
+        patchRemoveUpdate: Boolean,
         onGooglePlayPatch: () -> Unit, onAdsPatch: () -> Unit, onAdsBooleanPatch: () -> Unit,
         onUrlPatch: () -> Unit, onCaAppPubPatch: () -> Unit, onAnalyticsUrlPatch: () -> Unit,
         onGpServicesPatch: () -> Unit, onVpnPatch: () -> Unit, onInstallerCheckPatch: () -> Unit, onDebugItemRemove: () -> Unit,
-        onSignaturePatch: () -> Unit
+        onSignaturePatch: () -> Unit, onUpdateCheckPatch: () -> Unit
     ): ImmutableMethod {
 
         // ✅ НОВОЕ: подход APK ToolM — патчим ЦЕЛЫЙ метод, содержащий проверку подписи
@@ -547,6 +683,35 @@ fun patchPackageName(inputDex: File, outputDex: File, oldPackage: String, newPac
                 val newImpl = createSignatureBypassImplementation(method)
                 return ImmutableMethod(method.definingClass, method.name, method.parameters, method.returnType,
                     method.accessFlags, method.annotations, method.hiddenApiRestrictions, newImpl)
+            }
+        }
+
+        // ✅ Убрать проверку обновления (Google Play In-App Updates):
+        // 1) сам метод показа диалога -> false («не запущено»);
+        // 2) updateAvailability -> UPDATE_NOT_AVAILABLE (случай, когда приложение
+        //    показывает СВОЙ диалог на основании наличия обновления).
+        if (patchRemoveUpdate && method.implementation != null
+            && method.definingClass.startsWith("Lcom/google/android/play/core/appupdate")) {
+            if (method.name == "startUpdateFlowForResult" && method.returnType == "Z") {
+                onUpdateCheckPatch()
+                return buildReturnFalseMethod(method)
+            }
+            if (method.name == "updateAvailability" && method.returnType == "I") {
+                onUpdateCheckPatch()
+                return buildReturnIntMethod(method, 1)   // UPDATE_NOT_AVAILABLE
+            }
+        }
+
+        // ✅ RuStore SDK (ru.rustore.sdk.appupdate): «обновление недоступно» + не форсить
+        if (patchRemoveUpdate && method.implementation != null
+            && method.definingClass.startsWith("Lru/rustore/sdk/appupdate/")) {
+            if (method.name == "getUpdateAvailability" && method.returnType == "I") {
+                onUpdateCheckPatch()
+                return buildReturnIntMethod(method, 1)   // UPDATE_NOT_AVAILABLE
+            }
+            if (method.name == "getForceUpdateAvailable" && method.returnType == "Z") {
+                onUpdateCheckPatch()
+                return buildReturnFalseMethod(method)
             }
         }
 
@@ -799,6 +964,46 @@ fun patchPackageName(inputDex: File, outputDex: File, oldPackage: String, newPac
                 (hasGetPackageInfo && hasPackageInfoSignatures) ||
                 (hasSignatureApi && hasHashString) ||
                 (hasGetPackageInfo && hasHashString)
+    }
+
+    /** Метод-заглушка: возвращает заданное число. */
+    private fun buildReturnIntMethod(method: org.jf.dexlib2.iface.Method, value: Int): ImmutableMethod {
+        var words = if (method.accessFlags and 0x8 != 0) 0 else 1
+        for (pt in method.parameterTypes) {
+            val s = pt.toString()
+            words += if (s == "J" || s == "D") 2 else 1
+        }
+        val impl = ImmutableMethodImplementation(
+            words + 1,
+            listOf(
+                ImmutableInstruction11n(Opcode.CONST_4, 0, value),
+                ImmutableInstruction11x(Opcode.RETURN, 0)
+            ),
+            emptyList(),
+            emptyList()
+        )
+        return ImmutableMethod(method.definingClass, method.name, method.parameters, method.returnType,
+            method.accessFlags, method.annotations, method.hiddenApiRestrictions, impl)
+    }
+
+    /** Метод-заглушка: `const/4 v0, 0; return v0` — для отключения показа диалога обновления. */
+    private fun buildReturnFalseMethod(method: org.jf.dexlib2.iface.Method): ImmutableMethod {
+        var words = if (method.accessFlags and 0x8 != 0) 0 else 1
+        for (pt in method.parameterTypes) {
+            val s = pt.toString()
+            words += if (s == "J" || s == "D") 2 else 1
+        }
+        val impl = ImmutableMethodImplementation(
+            words + 1,
+            listOf(
+                ImmutableInstruction11n(Opcode.CONST_4, 0, 0),
+                ImmutableInstruction11x(Opcode.RETURN, 0)
+            ),
+            emptyList(),
+            emptyList()
+        )
+        return ImmutableMethod(method.definingClass, method.name, method.parameters, method.returnType,
+            method.accessFlags, method.annotations, method.hiddenApiRestrictions, impl)
     }
 
     private fun createSignatureBypassImplementation(method: org.jf.dexlib2.iface.Method): ImmutableMethodImplementation {

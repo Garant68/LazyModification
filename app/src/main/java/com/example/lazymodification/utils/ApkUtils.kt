@@ -7,14 +7,25 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.zip.ZipEntry
+import java.util.zip.ZipException
 import java.util.zip.ZipInputStream
 
 object ApkUtils {
 
     fun extractAllDex(apkFile: File, outputDir: File): List<File> {
+        // Быстрый путь: потоковое чтение ZipInputStream (как раньше).
+        // Минус: он сверяет CRC и падает на битом APK ("invalid entry CRC").
+        // При ошибке CRC — запасной путь через reanimated, который CRC не проверяет.
+        return try {
+            extractViaZipStream(apkFile, outputDir)
+        } catch (e: ZipException) {
+            extractViaReandroid(apkFile, outputDir)
+        }
+    }
+
+    private fun extractViaZipStream(apkFile: File, outputDir: File): List<File> {
         val dexFiles = mutableListOf<File>()
         val buffer = ByteArray(64 * 1024)
-
         ZipInputStream(FileInputStream(apkFile).buffered()).use { zis ->
             var entry: ZipEntry?
             while (zis.nextEntry.also { entry = it } != null) {
@@ -33,7 +44,30 @@ object ApkUtils {
                 zis.closeEntry()
             }
         }
+        if (dexFiles.isEmpty()) {
+            throw RuntimeException("DEX файлы не найдены в APK")
+        }
+        return dexFiles
+    }
 
+    private fun extractViaReandroid(apkFile: File, outputDir: File): List<File> {
+        val dexFiles = mutableListOf<File>()
+        // reanimated (ApkModule) читает записи напрямую, не сверяя CRC, —
+        // обходит "invalid entry CRC" на битых/криво перепакованных APK.
+        val module = ApkModule.loadApkFile(apkFile)
+        try {
+            for (input in module.listInputSources()) {
+                val name = input.alias ?: input.name
+                if (name.matches(Regex("classes\\d*\\.dex"))) {
+                    val dexFile = File(outputDir, name)
+                    dexFile.parentFile?.mkdirs()
+                    input.write(dexFile)
+                    dexFiles.add(dexFile)
+                }
+            }
+        } finally {
+            module.close()
+        }
         if (dexFiles.isEmpty()) {
             throw RuntimeException("DEX файлы не найдены в APK")
         }
