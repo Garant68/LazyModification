@@ -372,4 +372,39 @@
     <string name="insp_found">🎯 Намерено: %1$s</string>
     <string name="insp_found_none">🎯 Нищо типично не е намерено</string>    <string name="remove_update_check">Премахни проверката за обновление (Play, RuStore)</string>
     <string name="log_update_check">🔓 Проверка за обновление (Play): %1$d</string>
-    <string name="log_update_not_found_norebuild">❌ Проверката за обновление (Play) не е намерена — файлът не беше пресглобен</string>    <string name="insp_update_check">🔔 Проверка за обновление: %1$s</string></resources>
+    <string name="log_update_not_found_norebuild">❌ Проверката за обновление (Play) не е намерена — файлът не беше пресглобен</string>    <string name="insp_update_check">🔔 Проверка за обновление: %1$s</string>
+    <string name="tools_title">Инструменти</string>
+    <string name="tools_signature_section">🔑 Създаване на подпис</string>
+    <string name="tools_signature_desc">Тук можете да създадете собствен файл за подпис (keystore), с който да подписвате модифицирани APK.\n\nЗащо е нужно: Android инсталира само подписани приложения. След пачване APK трябва да се подпише отново — с ваш ключ. Важно: вече инсталирано приложение може да се обнови само със същия ключ, затова пазете файла и паролата.</string>
+    <string name="tools_create_signature">Създай подпис</string>
+    <string name="tools_signature_note">🔒 Файлът за подпис и паролите не се изпращат в мрежата — всичко се създава на устройството.</string>
+    <string name="sig_create_title">🔑 Създай подпис</string>
+    <string name="sig_intro">Попълнете данните за подписа. Обяснения има под всяко поле.</string>
+    <string name="sig_field_file">Име на файла</string>
+    <string name="sig_field_file_desc">Име на файла за подпис. Ще се запази в папката за изход (по подразбиране Download/LazyModification).</string>
+    <string name="sig_field_alias">Псевдоним на ключа (alias)</string>
+    <string name="sig_field_alias_desc">Вътрешно име на ключа в хранилището. Ще ви трябва при подписване — запомнете го.</string>
+    <string name="sig_field_store_pass">Парола на хранилището</string>
+    <string name="sig_field_store_pass_desc">Защитава файла за подпис. Запомнете паролата — не може да се възстанови.</string>
+    <string name="sig_field_key_pass">Парола на ключа (незадължително)</string>
+    <string name="sig_field_key_pass_desc">Оставете празно — ще съвпада с паролата на хранилището.</string>
+    <string name="sig_field_years">Срок на валидност, години</string>
+    <string name="sig_field_years_desc">Препоръчително е 30 години: Google Play изисква ключът да е валиден още поне 25 години.</string>
+    <string name="sig_field_cn">Собственик (CN)</string>
+    <string name="sig_field_cn_desc">Произволно име на собственика на сертификата (например псевдоним). Вижда се в свойствата на подписа.</string>
+    <string name="sig_default_name">my_signature</string>
+    <string name="sig_default_alias">mykey</string>
+    <string name="sig_default_years">30</string>
+    <string name="sig_default_cn">LazyModification</string>
+    <string name="sig_action_create">Създай</string>
+    <string name="sig_creating">⏳ Създаване на подпис…</string>
+    <string name="sig_created_title">✅ Подписът е създаден</string>
+    <string name="sig_created_msg">Файл: %1$s\nПапка: %2$s\nПсевдоним: %3$s\n\nКак да използвате: меню ⚙ → „Подпис“ → „Потребителски подпис“ → изберете този файл, въведете паролата и псевдонима. Всички APK ще се подписват с вашия ключ.</string>
+    <string name="sig_create_error">❌ Неуспешно създаване на подпис: %1$s</string>
+    <string name="sig_err_name">❌ Въведете име на файла</string>
+    <string name="sig_err_alias">❌ Въведете псевдоним на ключа</string>
+    <string name="sig_err_pass">❌ Паролата на хранилището не може да е празна</string>
+    <string name="sig_err_years">❌ Срок: въведете число от 1 до 100</string>
+    <string name="sig_field_type">Тип на хранилището</string>
+    <string name="sig_type_desc">PKCS12 е модерният формат (препоръчително). JKS е старият Java формат (за по-стари инструменти).</string>
+</resources>

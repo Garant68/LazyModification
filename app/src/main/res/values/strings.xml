@@ -378,4 +378,39 @@
     <string name="insp_found">🎯 Найдено: %1$s</string>
     <string name="insp_found_none">🎯 Ничего типичного не найдено</string>    <string name="remove_update_check">Убрать проверку обновления (Play, RuStore)</string>
     <string name="log_update_check">🔓 Проверка обновления (Play): %1$d</string>
-    <string name="log_update_not_found_norebuild">❌ Проверка обновления (Play) не найдена — файл не пересобирался</string>    <string name="insp_update_check">🔔 Проверка обновления: %1$s</string></resources>
+    <string name="log_update_not_found_norebuild">❌ Проверка обновления (Play) не найдена — файл не пересобирался</string>    <string name="insp_update_check">🔔 Проверка обновления: %1$s</string>
+    <string name="tools_title">Инструменты</string>
+    <string name="tools_signature_section">🔑 Создание подписи</string>
+    <string name="tools_signature_desc">Здесь можно создать собственный файл подписи (keystore), которым будут подписываться изменённые APK.\n\nЗачем это нужно: Android устанавливает только подписанные приложения. После патча APK нужно подписать заново — своим ключом. Важно: обновить установленное приложение можно только тем же ключом, поэтому файл подписи и пароль нужно сохранить и не терять.</string>
+    <string name="tools_create_signature">Создать подпись</string>
+    <string name="tools_signature_note">🔒 Файл подписи и пароли не отправляются в сеть — всё создаётся на устройстве.</string>
+    <string name="sig_create_title">🔑 Создать подпись</string>
+    <string name="sig_intro">Заполните данные подписи. Пояснения — под каждым полем.</string>
+    <string name="sig_field_file">Имя файла</string>
+    <string name="sig_field_file_desc">Имя будущего файла подписи. Файл сохранится в папку вывода (по умолчанию Download/LazyModification).</string>
+    <string name="sig_field_alias">Псевдоним ключа (alias)</string>
+    <string name="sig_field_alias_desc">Внутреннее имя ключа в хранилище. Понадобится при подписи — запомните его.</string>
+    <string name="sig_field_store_pass">Пароль хранилища</string>
+    <string name="sig_field_store_pass_desc">Защищает файл подписи. Запомните пароль — восстановить его невозможно.</string>
+    <string name="sig_field_key_pass">Пароль ключа (необязательно)</string>
+    <string name="sig_field_key_pass_desc">Оставьте пустым — будет совпадать с паролем хранилища.</string>
+    <string name="sig_field_years">Срок действия, лет</string>
+    <string name="sig_field_years_desc">Рекомендуется 30 лет: Google Play требует, чтобы подпись была действительна ещё минимум 25 лет.</string>
+    <string name="sig_field_cn">Владелец (CN)</string>
+    <string name="sig_field_cn_desc">Произвольное имя владельца сертификата (например, ник). Видно в свойствах подписи.</string>
+    <string name="sig_default_name">my_signature</string>
+    <string name="sig_default_alias">mykey</string>
+    <string name="sig_default_years">30</string>
+    <string name="sig_default_cn">LazyModification</string>
+    <string name="sig_action_create">Создать</string>
+    <string name="sig_creating">⏳ Создание подписи…</string>
+    <string name="sig_created_title">✅ Подпись создана</string>
+    <string name="sig_created_msg">Файл: %1$s\nПапка: %2$s\nПсевдоним: %3$s\n\nКак использовать: меню ⚙ → «Подпись» → «Пользовательская подпись» → выберите этот файл, введите пароль и псевдоним. После этого APK будут подписываться вашим ключом.</string>
+    <string name="sig_create_error">❌ Не удалось создать подпись: %1$s</string>
+    <string name="sig_err_name">❌ Укажите имя файла</string>
+    <string name="sig_err_alias">❌ Укажите псевдоним ключа</string>
+    <string name="sig_err_pass">❌ Пароль хранилища не может быть пустым</string>
+    <string name="sig_err_years">❌ Срок действия: укажите целое число от 1 до 100</string>
+    <string name="sig_field_type">Тип хранилища</string>
+    <string name="sig_type_desc">PKCS12 — современный формат, рекомендуется. JKS — старый формат Java (для совместимости со старыми инструментами).</string>
+</resources>

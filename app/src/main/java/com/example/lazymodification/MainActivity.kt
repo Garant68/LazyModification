@@ -22,6 +22,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnApkOperations: MaterialButton
     private lateinit var btnEdit: MaterialButton
     private lateinit var btnInterface: MaterialButton
+    private lateinit var btnTools: MaterialButton
     private lateinit var btnCompare: MaterialButton
     private lateinit var btnPatch: MaterialButton
     private lateinit var btnExit: MaterialButton
@@ -131,6 +132,7 @@ class MainActivity : AppCompatActivity() {
         btnApkOperations = findViewById(R.id.btnApkOperations)
         btnEdit = findViewById(R.id.btnEdit)
         btnInterface = findViewById(R.id.btnInterface)
+        btnTools = findViewById(R.id.btnTools)
         btnCompare = findViewById(R.id.btnCompare)
         btnPatch = findViewById(R.id.btnPatch)
         btnExit = findViewById(R.id.btnExit)
@@ -139,6 +141,7 @@ class MainActivity : AppCompatActivity() {
         setupApkOperationsButton()
         setupEditButton()
         setupInterfaceButton()
+        setupToolsButton()
         setupCompareButton()
         setupPatchButton()
         setupExitButton()
@@ -251,6 +254,12 @@ class MainActivity : AppCompatActivity() {
                     putExtra(FileBrowserActivity.EXTRA_FILE_MODE, FileBrowserActivity.MODE_APK)
                 }
             )
+        }
+    }
+
+    private fun setupToolsButton() {
+        btnTools.setOnClickListener {
+            startActivity(Intent(this, ToolsActivity::class.java))
         }
     }
 

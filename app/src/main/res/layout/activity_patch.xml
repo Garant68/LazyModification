@@ -32,259 +32,129 @@
             android:gravity="center"
             android:layout_marginBottom="20dp"/>
 
-        <com.google.android.material.card.MaterialCardView
+                <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnInspectorApk"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="1dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="?attr/colorOutline">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp">
-                <CheckBox
-                    android:id="@+id/checkBoxInspector"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/inspector_title"/>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            android:layout_marginBottom="12dp"
+            android:padding="16dp"
+            android:text="@string/inspector_title"
+            android:textSize="16sp"
+            app:icon="@android:drawable/ic_menu_search"
+            app:iconGravity="textStart"
+            app:iconPadding="12dp"/>
 
-        <com.google.android.material.card.MaterialCardView
+                <com.google.android.material.button.MaterialButton
+            android:id="@+id/checkBoxGooglePlay"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="1dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="?attr/colorOutline">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp">
-                <CheckBox
-                    android:id="@+id/checkBoxGooglePlay"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/remove_google_play_redirect"/>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            android:checkable="true"
+            android:padding="16dp"
+            android:text="@string/remove_google_play_redirect"
+            android:textSize="16sp"/>
 
-        <com.google.android.material.card.MaterialCardView
+                <com.google.android.material.button.MaterialButton
+            android:id="@+id/checkBoxRemoveAds"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="1dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="?attr/colorOutline">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp">
-                <CheckBox
-                    android:id="@+id/checkBoxRemoveAds"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/remove_ads_calls"/>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            android:checkable="true"
+            android:padding="16dp"
+            android:text="@string/remove_ads_calls"
+            android:textSize="16sp"/>
 
-        <com.google.android.material.card.MaterialCardView
+                <com.google.android.material.button.MaterialButton
+            android:id="@+id/checkBoxRemoveAnalytics"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="1dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="?attr/colorOutline">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp">
-                <CheckBox
-                    android:id="@+id/checkBoxRemoveAnalytics"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/remove_analytics"/>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            android:checkable="true"
+            android:padding="16dp"
+            android:text="@string/remove_analytics"
+            android:textSize="16sp"/>
 
-        <com.google.android.material.card.MaterialCardView
+                <com.google.android.material.button.MaterialButton
+            android:id="@+id/checkBoxRemoveUpdate"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="1dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="?attr/colorOutline">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp">
-                <CheckBox
-                    android:id="@+id/checkBoxRemoveUpdate"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/remove_update_check"/>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            android:checkable="true"
+            android:padding="16dp"
+            android:text="@string/remove_update_check"
+            android:textSize="16sp"/>
 
-        <com.google.android.material.card.MaterialCardView
+                <com.google.android.material.button.MaterialButton
+            android:id="@+id/checkBoxRemoveGPServices"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="1dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="?attr/colorOutline">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp">
-                <CheckBox
-                    android:id="@+id/checkBoxRemoveGPServices"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/remove_gp_services"/>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            android:checkable="true"
+            android:padding="16dp"
+            android:text="@string/remove_gp_services"
+            android:textSize="16sp"/>
 
-        <com.google.android.material.card.MaterialCardView
+                <com.google.android.material.button.MaterialButton
+            android:id="@+id/checkBoxRemoveVpn"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="1dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="?attr/colorOutline">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp">
-                <CheckBox
-                    android:id="@+id/checkBoxRemoveVpn"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/remove_vpn_detection"/>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            android:checkable="true"
+            android:padding="16dp"
+            android:text="@string/remove_vpn_detection"
+            android:textSize="16sp"/>
 
-        <com.google.android.material.card.MaterialCardView
+                <com.google.android.material.button.MaterialButton
+            android:id="@+id/checkBoxRemoveInstallerCheck"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="1dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="?attr/colorOutline">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp">
-                <CheckBox
-                    android:id="@+id/checkBoxRemoveInstallerCheck"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/remove_installer_check"/>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            android:checkable="true"
+            android:padding="16dp"
+            android:text="@string/remove_installer_check"
+            android:textSize="16sp"/>
 
-        <com.google.android.material.card.MaterialCardView
+                <com.google.android.material.button.MaterialButton
+            android:id="@+id/checkBoxRemoveLocales"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="1dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="?attr/colorOutline">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp">
-                <CheckBox
-                    android:id="@+id/checkBoxRemoveLocales"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/remove_locale_packages"/>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            android:checkable="true"
+            android:padding="16dp"
+            android:text="@string/remove_locale_packages"
+            android:textSize="16sp"/>
 
-        <com.google.android.material.card.MaterialCardView
+                <com.google.android.material.button.MaterialButton
+            android:id="@+id/checkBoxRemoveDpi"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="1dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="?attr/colorOutline">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp">
-                <CheckBox
-                    android:id="@+id/checkBoxRemoveDpi"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/remove_dpi_duplicates"/>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            android:checkable="true"
+            android:padding="16dp"
+            android:text="@string/remove_dpi_duplicates"
+            android:textSize="16sp"/>
 
         <!-- ✅ НОВЫЙ ЧЕКБОКС: Удаление библиотек (архитектур) -->
-        <com.google.android.material.card.MaterialCardView
+                <com.google.android.material.button.MaterialButton
+            android:id="@+id/checkBoxRemoveLibs"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="20dp"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="1dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="?attr/colorOutline">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp">
-                <CheckBox
-                    android:id="@+id/checkBoxRemoveLibs"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/remove_libs_archs"/>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            android:layout_marginBottom="8dp"
+            android:checkable="true"
+            android:padding="16dp"
+            android:text="@string/remove_libs_archs"
+            android:textSize="16sp"/>
 
         <!-- ✅ НОВЫЙ ЧЕКБОКС: Оптимизация -->
-        <com.google.android.material.card.MaterialCardView
+                <com.google.android.material.button.MaterialButton
+            android:id="@+id/checkBoxOptimize"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="20dp"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="1dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="?attr/colorOutline">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp">
-                <CheckBox
-                    android:id="@+id/checkBoxOptimize"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/optimize"/>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            android:layout_marginBottom="8dp"
+            android:checkable="true"
+            android:padding="16dp"
+            android:text="@string/optimize"
+            android:textSize="16sp"/>
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnPatch"
             android:layout_width="match_parent"

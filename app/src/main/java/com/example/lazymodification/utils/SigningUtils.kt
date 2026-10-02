@@ -21,6 +21,7 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.security.KeyStore
 import java.security.PrivateKey
+import java.security.Provider
 import java.security.Security
 import java.security.cert.X509Certificate
 import java.util.zip.ZipEntry
@@ -117,13 +118,32 @@ object SigningUtils {
         } catch (_: Throwable) {}
     }
 
+    /** Свой экземпляр BouncyCastle: на Android имя "BC" занято системным провайдером. */
+    private val bcProvider: Provider by lazy { org.bouncycastle.jce.provider.BouncyCastleProvider() }
+
+    /**
+     * Открывает хранилище ключей: сначала системный провайдер,
+     * при неудаче — собственная поддержка JKS (Android) или BC (BKS и т.п.).
+     */
+    fun openKeyStore(type: String): KeyStore {
+        return try {
+            KeyStore.getInstance(type)
+        } catch (t: Throwable) {
+            if (type.equals("JKS", ignoreCase = true)) {
+                JksSupport.openJks()
+            } else {
+                KeyStore.getInstance(type, bcProvider)
+            }
+        }
+    }
+
     private fun loadKeyStoreAuto(file: File, password: CharArray, preferredType: String): Pair<KeyStore, String> {
         ensureBouncyCastle()
         val candidates = listOf(preferredType, "PKCS12", "JKS", "BKS").distinct()
         var lastError: Exception? = null
         for (type in candidates) {
             try {
-                val ks = KeyStore.getInstance(type)
+                val ks = openKeyStore(type)
                 FileInputStream(file).use { ks.load(it, password) }
                 return ks to type
             } catch (e: Exception) {
@@ -327,12 +347,21 @@ object SigningUtils {
 
     fun copyKeystoreToCache(context: Context, uri: Uri): File? {
         return try {
+            // Отдельная папка для копии хранилища ключей: чистим старые копии
+            val dir = File(context.filesDir, "keystore").apply { mkdirs() }
+            dir.listFiles()?.forEach { it.delete() }
+            // легаси: старые копии под фиксированным именем
             context.filesDir.listFiles()
                 ?.filter { it.name.startsWith("custom_keystore.") }
                 ?.forEach { it.delete() }
-            val fileName = getFileNameFromUri(context, uri) ?: "custom_keystore"
-            val ext = fileName.substringAfterLast('.', "p12").lowercase()
-            val storeFile = File(context.filesDir, "custom_keystore.$ext")
+
+            // Сохраняем ИСХОДНОЕ имя файла — оно и показывается в диалоге подписи
+            val originalName = getFileNameFromUri(context, uri) ?: "custom_keystore.p12"
+            val ext = originalName.substringAfterLast('.', "p12").lowercase()
+            val base = originalName.substringBeforeLast('.').ifBlank { "custom_keystore" }
+            val safeBase = base.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifBlank { "custom_keystore" }
+            val storeFile = File(dir, "$safeBase.$ext")
+            if (storeFile.exists()) storeFile.delete()
             context.contentResolver.openInputStream(uri)?.use { input ->
                 storeFile.outputStream().use { output -> input.copyTo(output) }
             }
@@ -473,7 +502,7 @@ object SigningUtils {
 
         if (config.useCustom) {
             ensureBouncyCastle()
-            keyStore = KeyStore.getInstance(config.keystoreType)
+            keyStore = openKeyStore(config.keystoreType)
             FileInputStream(File(config.customKeystorePath!!)).use {
                 keyStore.load(it, config.keystorePassword.toCharArray())
             }

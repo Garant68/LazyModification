@@ -380,4 +380,39 @@
     <string name="insp_found">🎯 Found: %1$s</string>
     <string name="insp_found_none">🎯 Nothing typical found</string>    <string name="remove_update_check">Remove update check (Play, RuStore)</string>
     <string name="log_update_check">🔓 Update check (Play): %1$d</string>
-    <string name="log_update_not_found_norebuild">❌ Update check (Play) not found — the file was not rebuilt</string>    <string name="insp_update_check">🔔 Update check: %1$s</string></resources>
+    <string name="log_update_not_found_norebuild">❌ Update check (Play) not found — the file was not rebuilt</string>    <string name="insp_update_check">🔔 Update check: %1$s</string>
+    <string name="tools_title">Tools</string>
+    <string name="tools_signature_section">🔑 Create signature</string>
+    <string name="tools_signature_desc">Here you can create your own signature file (keystore) to sign modified APKs.\n\nWhy it matters: Android only installs signed apps. After patching, the APK must be signed again with your own key. Note: an installed app can only be updated with the same key — keep the signature file and password safe.</string>
+    <string name="tools_create_signature">Create signature</string>
+    <string name="tools_signature_note">🔒 The signature file and passwords never leave your device — everything is generated locally.</string>
+    <string name="sig_create_title">🔑 Create signature</string>
+    <string name="sig_intro">Fill in the signature details. Explanations are shown under each field.</string>
+    <string name="sig_field_file">File name</string>
+    <string name="sig_field_file_desc">Name of the signature file. It will be saved to the output folder (Download/LazyModification by default).</string>
+    <string name="sig_field_alias">Key alias</string>
+    <string name="sig_field_alias_desc">Internal key name inside the keystore. You will need it when signing — remember it.</string>
+    <string name="sig_field_store_pass">Keystore password</string>
+    <string name="sig_field_store_pass_desc">Protects the signature file. Remember it — it cannot be recovered.</string>
+    <string name="sig_field_key_pass">Key password (optional)</string>
+    <string name="sig_field_key_pass_desc">Leave empty to use the keystore password.</string>
+    <string name="sig_field_years">Validity, years</string>
+    <string name="sig_field_years_desc">30 years is recommended: Google Play requires the signing key to remain valid for at least 25 years.</string>
+    <string name="sig_field_cn">Owner (CN)</string>
+    <string name="sig_field_cn_desc">Any owner name for the certificate (for example, a nickname). It is visible in the signature details.</string>
+    <string name="sig_default_name">my_signature</string>
+    <string name="sig_default_alias">mykey</string>
+    <string name="sig_default_years">30</string>
+    <string name="sig_default_cn">LazyModification</string>
+    <string name="sig_action_create">Create</string>
+    <string name="sig_creating">⏳ Creating signature…</string>
+    <string name="sig_created_title">✅ Signature created</string>
+    <string name="sig_created_msg">File: %1$s\nFolder: %2$s\nAlias: %3$s\n\nHow to use: menu ⚙ → “Signature” → “Custom signature” → select this file, enter the password and alias. All APKs will then be signed with your key.</string>
+    <string name="sig_create_error">❌ Failed to create signature: %1$s</string>
+    <string name="sig_err_name">❌ Enter the file name</string>
+    <string name="sig_err_alias">❌ Enter the key alias</string>
+    <string name="sig_err_pass">❌ Keystore password cannot be empty</string>
+    <string name="sig_err_years">❌ Validity: enter a number from 1 to 100</string>
+    <string name="sig_field_type">Keystore type</string>
+    <string name="sig_type_desc">PKCS12 is the modern format (recommended). JKS is the legacy Java format (for older tools).</string>
+</resources>

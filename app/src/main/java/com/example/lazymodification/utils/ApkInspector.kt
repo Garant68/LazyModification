@@ -157,39 +157,20 @@ object ApkInspector {
         if (hasRuStoreUpdate) upd.add("RuStore")
         sb.append("🔔 ").append(context.getString(R.string.insp_update_check, if (upd.isEmpty()) context.getString(R.string.insp_none) else upd.joinToString(", "))).append("\n")
 
-        // --- языки и находки (strings в resources) ---
+        // --- языки и находки (потоково, без тяжёлой таблицы ресурсов) ---
         val langs = sortedSetOf<String>()
         val found = LinkedHashSet<String>()
         try {
-            val module = ApkModule.loadApkFile(apk)
-            try {
-                for (pkg in module.tableBlock.listPackages()) {
-                    val strings = pkg.getResources("string")
-                    while (strings.hasNext()) {
-                        val entry = strings.next()
-                        val cfg = entry.getConfigs()
-                        while (cfg.hasNext()) {
-                            val lang = cfg.next().language
-                            if (!lang.isNullOrEmpty()) langs.add(lang)
-                        }
-                        val def = entry.get(com.reandroid.arsc.value.ResConfig.getDefault())
-                        if (def != null && !def.isNull()) {
-                            val v = def.getValueAsString()
-                            if (v != null && v.length in 2..60) {
-                                val low = v.lowercase()
-                                if (FIND_NEEDLES.any { low.contains(it) } && found.size < 8 && !found.contains(v)) {
-                                    found.add(v)
-                                }
-                            }
-                        }
-                    }
-                }
-            } finally {
-                module.close()
+            for (q in DexPatcher.readLocalesFromApk(apk)) {
+                val lang = qualifierToLanguage(q)
+                if (lang != null) langs.add(lang)
             }
         } catch (_: Throwable) {
         }
-
+        try {
+            found.addAll(DexPatcher.readDefaultStringValues(apk, FIND_NEEDLES, 8))
+        } catch (_: Throwable) {
+        }
         if (langs.isNotEmpty()) {
             val preview = langs.take(8).joinToString(", ")
             sb.append("🌍 ").append(context.getString(R.string.insp_locales, langs.size, preview)).append("\n")
@@ -230,4 +211,13 @@ object ApkInspector {
         }
         return false
     }
-}
+
+    private fun qualifierToLanguage(qualifier: String): String? {
+        val clean = qualifier.trimStart('-')
+        if (clean.startsWith("b+")) {
+            val parts = clean.split('+')
+            return if (parts.size >= 2 && parts[1].length in 2..3) parts[1] else null
+        }
+        val first = clean.substringBefore('-')
+        return if (first.length in 2..3) first else null
+    }}

@@ -31,18 +31,18 @@ class PatchActivity : AppCompatActivity() {
     }
 
     private lateinit var tvFileName: TextView
-    private lateinit var checkBoxGooglePlay: CheckBox
-    private lateinit var checkBoxRemoveAds: CheckBox
-    private lateinit var checkBoxRemoveAnalytics: CheckBox
-    private lateinit var checkBoxRemoveGPServices: CheckBox
-    private lateinit var checkBoxRemoveVpn: CheckBox
-    private lateinit var checkBoxRemoveInstallerCheck: CheckBox
-    private lateinit var checkBoxRemoveUpdate: CheckBox
-    private lateinit var checkBoxRemoveLocales: CheckBox
-    private lateinit var checkBoxRemoveDpi: CheckBox
-    private lateinit var checkBoxRemoveLibs: CheckBox
-    private lateinit var checkBoxOptimize: CheckBox
-    private lateinit var checkBoxInspector: CheckBox
+    private lateinit var checkBoxGooglePlay: MaterialButton
+    private lateinit var checkBoxRemoveAds: MaterialButton
+    private lateinit var checkBoxRemoveAnalytics: MaterialButton
+    private lateinit var checkBoxRemoveGPServices: MaterialButton
+    private lateinit var checkBoxRemoveVpn: MaterialButton
+    private lateinit var checkBoxRemoveInstallerCheck: MaterialButton
+    private lateinit var checkBoxRemoveUpdate: MaterialButton
+    private lateinit var checkBoxRemoveLocales: MaterialButton
+    private lateinit var checkBoxRemoveDpi: MaterialButton
+    private lateinit var checkBoxRemoveLibs: MaterialButton
+    private lateinit var checkBoxOptimize: MaterialButton
+    private lateinit var btnInspectorApk: MaterialButton
     private var isInspecting = false
     private var inspectorProgress: AlertDialog? = null
     private lateinit var btnPatch: MaterialButton
@@ -100,7 +100,7 @@ class PatchActivity : AppCompatActivity() {
         checkBoxRemoveDpi = findViewById(R.id.checkBoxRemoveDpi)
         checkBoxRemoveLibs = findViewById(R.id.checkBoxRemoveLibs)
         checkBoxOptimize = findViewById(R.id.checkBoxOptimize)
-        checkBoxInspector = findViewById(R.id.checkBoxInspector)
+        btnInspectorApk = findViewById(R.id.btnInspectorApk)
         btnPatch = findViewById(R.id.btnPatch)
 
         apkPath = intent.getStringExtra(EXTRA_APK_PATH)
@@ -124,8 +124,6 @@ class PatchActivity : AppCompatActivity() {
         btnPatch.setOnClickListener {
             if (otherPatchesSelected()) {
                 showSigningDialog()
-            } else {
-                runInspector()
             }
         }
     }
@@ -193,7 +191,9 @@ class PatchActivity : AppCompatActivity() {
     }
 
     private fun setupCheckboxes() {
-        val listener = android.widget.CompoundButton.OnCheckedChangeListener { buttonView, isChecked ->
+        val listener = MaterialButton.OnCheckedChangeListener { buttonView, isChecked ->
+            // Отметка ☐/☑ прямо в тексте кнопки — всегда видно
+            refreshToggleText(buttonView)
             when (buttonView.id) {
                 R.id.checkBoxRemoveLocales -> handleLocalesCheckbox(isChecked)
                 R.id.checkBoxRemoveDpi -> handleDpiCheckbox(isChecked)
@@ -201,23 +201,40 @@ class PatchActivity : AppCompatActivity() {
                 else -> updatePatchButtonState()
             }
         }
-        checkBoxGooglePlay.setOnCheckedChangeListener(listener)
-        checkBoxRemoveAds.setOnCheckedChangeListener(listener)
-        checkBoxRemoveAnalytics.setOnCheckedChangeListener(listener)
-        checkBoxRemoveGPServices.setOnCheckedChangeListener(listener)
-        checkBoxRemoveVpn.setOnCheckedChangeListener(listener)
-        checkBoxRemoveInstallerCheck.setOnCheckedChangeListener(listener)
-        checkBoxRemoveUpdate.setOnCheckedChangeListener(listener)
-        checkBoxRemoveLocales.setOnCheckedChangeListener(listener)
-        checkBoxRemoveDpi.setOnCheckedChangeListener(listener)
-        checkBoxRemoveLibs.setOnCheckedChangeListener(listener)
-        checkBoxOptimize.setOnCheckedChangeListener(listener)
-        checkBoxInspector.setOnCheckedChangeListener { _, isChecked ->
-            updatePatchButtonState()
-            if (isChecked) {
-                runInspector()
-            }
+        checkBoxGooglePlay.addOnCheckedChangeListener(listener)
+        checkBoxRemoveAds.addOnCheckedChangeListener(listener)
+        checkBoxRemoveAnalytics.addOnCheckedChangeListener(listener)
+        checkBoxRemoveGPServices.addOnCheckedChangeListener(listener)
+        checkBoxRemoveVpn.addOnCheckedChangeListener(listener)
+        checkBoxRemoveInstallerCheck.addOnCheckedChangeListener(listener)
+        checkBoxRemoveUpdate.addOnCheckedChangeListener(listener)
+        checkBoxRemoveLocales.addOnCheckedChangeListener(listener)
+        checkBoxRemoveDpi.addOnCheckedChangeListener(listener)
+        checkBoxRemoveLibs.addOnCheckedChangeListener(listener)
+        checkBoxOptimize.addOnCheckedChangeListener(listener)
+
+        // MaterialButton: переключение отметки по нажатию
+        checkBoxGooglePlay.setToggleCheckedStateOnClick(true)
+        checkBoxRemoveAds.setToggleCheckedStateOnClick(true)
+        checkBoxRemoveAnalytics.setToggleCheckedStateOnClick(true)
+        checkBoxRemoveGPServices.setToggleCheckedStateOnClick(true)
+        checkBoxRemoveVpn.setToggleCheckedStateOnClick(true)
+        checkBoxRemoveInstallerCheck.setToggleCheckedStateOnClick(true)
+        checkBoxRemoveUpdate.setToggleCheckedStateOnClick(true)
+        checkBoxRemoveLocales.setToggleCheckedStateOnClick(true)
+        checkBoxRemoveDpi.setToggleCheckedStateOnClick(true)
+        checkBoxRemoveLibs.setToggleCheckedStateOnClick(true)
+        checkBoxOptimize.setToggleCheckedStateOnClick(true)
+
+        for (b in listOf(
+            checkBoxGooglePlay, checkBoxRemoveAds, checkBoxRemoveAnalytics, checkBoxRemoveGPServices,
+            checkBoxRemoveVpn, checkBoxRemoveInstallerCheck, checkBoxRemoveUpdate, checkBoxRemoveLocales,
+            checkBoxRemoveDpi, checkBoxRemoveLibs, checkBoxOptimize
+        )) {
+            refreshToggleText(b)
         }
+
+        btnInspectorApk.setOnClickListener { runInspector() }
     }
 
     private fun handleLibsCheckbox(isChecked: Boolean) {
@@ -356,8 +373,7 @@ class PatchActivity : AppCompatActivity() {
         val any = checkBoxGooglePlay.isChecked || checkBoxRemoveAds.isChecked ||
                 checkBoxRemoveAnalytics.isChecked || checkBoxRemoveGPServices.isChecked ||
                 checkBoxRemoveVpn.isChecked || checkBoxRemoveInstallerCheck.isChecked || checkBoxRemoveUpdate.isChecked || checkBoxRemoveLocales.isChecked ||
-                checkBoxRemoveDpi.isChecked || checkBoxRemoveLibs.isChecked || checkBoxOptimize.isChecked ||
-                checkBoxInspector.isChecked
+                checkBoxRemoveDpi.isChecked || checkBoxRemoveLibs.isChecked || checkBoxOptimize.isChecked
         btnPatch.isEnabled = any
         btnPatch.visibility = if (any) View.VISIBLE else View.GONE
     }
@@ -532,14 +548,14 @@ class PatchActivity : AppCompatActivity() {
         } else {
             clean.split('-').firstOrNull() ?: ""
         }
-        extraLocaleNames[lang]?.let { return "${getString(it)} $qualifier" }
+        extraLocaleNames[lang]?.let { return "${getString(it)} $clean" }
         return try {
             if (clean.startsWith("b+")) {
                 val parts = clean.split('+')
                 if (parts.size >= 2) {
                     val locale = java.util.Locale(parts[1])
                     val displayName = locale.getDisplayLanguage(java.util.Locale.getDefault()).replaceFirstChar { it.uppercase() }
-                    "$displayName $qualifier"
+                    "$displayName $clean"
                 } else qualifier
             } else {
                 val parts = clean.split('-')
@@ -552,8 +568,8 @@ class PatchActivity : AppCompatActivity() {
                 val displayName = locale.getDisplayLanguage(java.util.Locale.getDefault()).replaceFirstChar { it.uppercase() }
                 if (country != null) {
                     val countryName = locale.getDisplayCountry(java.util.Locale.getDefault())
-                    if (countryName.isNotEmpty()) "$displayName ($countryName) $qualifier" else "$displayName $qualifier"
-                } else "$displayName $qualifier"
+                    if (countryName.isNotEmpty()) "$displayName ($countryName) $clean" else "$displayName $clean"
+                } else "$displayName $clean"
             }
         } catch (e: Exception) { qualifier }
     }
@@ -601,10 +617,17 @@ class PatchActivity : AppCompatActivity() {
         }.start()
     }
 
+    /** Отметка в тексте кнопки: ☐ — не выбрано, ☑ — выбрано. */
+    private fun refreshToggleText(btn: MaterialButton) {
+        val base = btn.text.toString().removePrefix("☐ ").removePrefix("☑ ")
+        btn.text = (if (btn.isChecked) "☑ " else "☐ ") + base
+    }
+
     private fun otherPatchesSelected(): Boolean {
         return checkBoxGooglePlay.isChecked || checkBoxRemoveAds.isChecked ||
                 checkBoxRemoveAnalytics.isChecked || checkBoxRemoveGPServices.isChecked ||
                 checkBoxRemoveVpn.isChecked || checkBoxRemoveInstallerCheck.isChecked ||
+                checkBoxRemoveUpdate.isChecked ||
                 checkBoxRemoveLocales.isChecked || checkBoxRemoveDpi.isChecked ||
                 checkBoxRemoveLibs.isChecked || checkBoxOptimize.isChecked
     }

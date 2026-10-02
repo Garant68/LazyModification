@@ -4,6 +4,10 @@ import com.reandroid.apk.ApkModule
 import com.reandroid.arsc.chunk.TableBlock
 import com.reandroid.arsc.chunk.TypeBlock
 import com.reandroid.xml.XMLFactory
+import com.reandroid.arsc.chunk.xml.ResXmlElement
+import com.reandroid.arsc.io.BlockReader
+import com.reandroid.arsc.value.ResConfig
+import com.reandroid.archive.ByteInputSource
 import org.jf.dexlib2.DexFileFactory
 import org.jf.dexlib2.Opcodes
 import org.jf.dexlib2.Opcode
@@ -28,6 +32,13 @@ import org.jf.dexlib2.immutable.reference.ImmutableStringReference
 import org.jf.dexlib2.immutable.value.ImmutableStringEncodedValue
 import java.io.File
 import java.io.StringReader
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
+import java.io.EOFException
+import java.io.FileOutputStream
+import java.io.InputStream
+import java.io.OutputStream
+import java.util.zip.ZipFile
 
 data class PatchResult(
     val googlePlayPatched: Int = 0,
@@ -503,107 +514,676 @@ fun patchPackageName(inputDex: File, outputDex: File, oldPackage: String, newPac
         try {
             val apkModule = ApkModule.loadApkFile(inputApk)
             val manifest = apkModule.androidManifest ?: throw IllegalStateException("AndroidManifest.xml не найден")
-            val packageBlock = apkModule.tableBlock.pickOne()
-            if (packageBlock != null) manifest.setPackageBlock(packageBlock)
-            var xml = manifest.serializeToXml()
-
-            MANIFEST_PATTERN_1?.let { xml = it.replace(xml) { count++; MANIFEST_COMMENT } }
-            MANIFEST_PATTERN_2?.let { xml = it.replace(xml) { count++; MANIFEST_COMMENT } }
-
-            try { manifest.javaClass.getMethod("clear").invoke(manifest) } catch (_: Exception) { try { manifest.javaClass.getMethod("reset").invoke(manifest) } catch (_: Exception) {} }
-            val parser = XMLFactory.newPullParser(StringReader(xml)); parser.setInput(StringReader(xml)); manifest.parse(parser)
+            // ВАЖНО: НЕ трогаем apkModule.tableBlock — на APK с огромным resources.arsc
+            // его разбор требует сотни МБ памяти и валит приложение с OutOfMemoryError.
+            // Удаляем узлы рекламно-аналитических SDK прямо в дереве XML-документа.
+            val root = manifest.documentElement
+                ?: throw IllegalStateException("Не удалось получить корень манифеста")
+            count = removeAnalyticsManifestNodes(root)
             apkModule.writeApk(outputApk)
-        } catch (e: Exception) {
-            android.util.Log.e(TAG, "❌ Ошибка патчинга манифеста: ${e.message}", e)
+            apkModule.close()
+        } catch (t: Throwable) {
+            android.util.Log.e(TAG, "❌ Ошибка патчинга манифеста: ${t.message}", t)
             if (!outputApk.exists() || outputApk.length() == 0L) inputApk.copyTo(outputApk, overwrite = true)
+            count = 0
         }
         android.util.Log.d("DexPatcher", "PATCH replaced=" + count)
         return count
     }
 
-    // ============================================================
-    // ЛОКАЛИЗАЦИИ
-    // ============================================================
-    fun readLocalesFromApk(apkFile: File): List<String> {
-        // ВАЖНО: ARSCLib на Android может бросить Error (CoderMalfunctionError) на «битых»
-        // строках ресурсов — ловим Throwable, чтобы не валить приложение.
+    private val MANIFEST_COMPONENT_TAGS = setOf("activity", "activity-alias", "receiver", "service", "provider")
+    private val MANIFEST_CHILD_TAGS = setOf("intent-filter", "meta-data", "action", "data", "category", "property")
+
+    // Удаляет рекламно-аналитические узлы манифеста, сверяясь с MANIFEST_PATTERN_1/2
+    // по синтезированному фрагменту XML конкретного узла (без сериализации всего документа).
+    private fun removeAnalyticsManifestNodes(root: ResXmlElement): Int {
+        var removed = 0
+        val children = ArrayList<ResXmlElement>()
+        val it = root.elements
+        while (it.hasNext()) {
+            val n = it.next()
+            if (n is ResXmlElement) children.add(n)
+        }
+        for (el in children) {
+            val tag = el.name
+            if (tag == "intent" && manifestIntentMatches(el)) {
+                el.removeSelf(); removed++; continue
+            }
+            val value = if (tag != null) manifestNameAttr(el) else null
+            if (tag != null && value != null) {
+                var synth: String? = null
+                if (tag in MANIFEST_COMPONENT_TAGS) {
+                    val ct = firstManifestListedChildTag(el)
+                    synth = if (ct != null)
+                        "<$tag android:name=\"$value\"> <$ct/> </$tag>"
+                    else
+                        "<$tag android:name=\"$value\"/>"
+                } else if (tag == "meta-data" || tag == "uses-library" || tag == "property" || tag == "uses-permission") {
+                    synth = "<$tag android:name=\"$value\"/>"
+                } else if (tag == "package") {
+                    synth = "<package android:name=\"$value\" />"
+                }
+                if (synth != null) {
+                    val hit = MANIFEST_PATTERN_1?.containsMatchIn(synth) == true ||
+                            MANIFEST_PATTERN_2?.containsMatchIn(synth) == true
+                    if (hit) { el.removeSelf(); removed++; continue }
+                }
+            }
+            removed += removeAnalyticsManifestNodes(el)
+        }
+        return removed
+    }
+
+    private fun manifestIntentMatches(intent: ResXmlElement): Boolean {
         return try {
-            val apkModule = ApkModule.loadApkFile(apkFile)
-            val tableBlock: TableBlock = apkModule.tableBlock
-                ?: throw IllegalStateException("В APK нет resources.arsc")
+            val it = intent.elements
+            while (it.hasNext()) {
+                val n = it.next()
+                if (n !is ResXmlElement) continue
+                val t = n.name ?: continue
+                if (t != "package" && t != "action") continue
+                val v = manifestNameAttr(n) ?: continue
+                val synth = "<intent> <$t android:name=\"$v\"/> </intent>"
+                if (MANIFEST_PATTERN_1?.containsMatchIn(synth) == true ||
+                    MANIFEST_PATTERN_2?.containsMatchIn(synth) == true) return true
+            }
+            false
+        } catch (t: Throwable) { false }
+    }
 
+    private fun manifestNameAttr(el: ResXmlElement): String? {
+        return try {
+            var v: String? = null
+            val at = el.attributes
+            while (at.hasNext()) {
+                val a = at.next()
+                if (a.name == "name") v = a.valueString
+            }
+            v
+        } catch (t: Throwable) { null }
+    }
+
+    private fun firstManifestListedChildTag(el: ResXmlElement): String? {
+        return try {
+            val it = el.elements
+            while (it.hasNext()) {
+                val n = it.next()
+                if (n is ResXmlElement) {
+                    val t = n.name
+                    if (t != null && t in MANIFEST_CHILD_TAGS) return t
+                }
+            }
+            null
+        } catch (t: Throwable) { null }
+    }
+
+    // ============================================================
+    // ЛОКАЛИЗАЦИИ — потоковое чтение resources.arsc (без ARSCLib-таблицы)
+    // ============================================================
+
+    fun readLocalesFromApk(apkFile: File): List<String> {
+        // ВАЖНО: НЕ используем ApkModule.tableBlock — на APK с огромным resources.arsc
+        // (36+ МБ) его разбор требует сотни МБ и приводит к OutOfMemoryError на устройстве.
+        // Читаем чанки resources.arsc потоково, конфиги разбираем лёгким ResConfig.
+        // ARSCLib может бросить Error (CoderMalfunctionError) — ловим Throwable.
+        return try {
             val localesSet = linkedSetOf<String>()
-
-            for (packageBlock in tableBlock.listPackages()) {
-                for (specTypePair in packageBlock.listSpecTypePairs()) {
-                    for (typeBlock in specTypePair) {
-                        val qualifiers = typeBlock.resConfig.qualifiers
-                        if (isLanguageQualifier(qualifiers)) {
-                            localesSet.add(qualifiers)
+            ZipFile(apkFile).use { zf ->
+                val entry = zf.getEntry("resources.arsc")
+                if (entry != null) {
+                    zf.getInputStream(entry).use { raw ->
+                        BufferedInputStream(raw, 1 shl 16).use { input ->
+                            walkArscChunks(input, entry.size, localesSet)
                         }
                     }
                 }
             }
-
-            apkModule.close()
             localesSet.toList().sorted()
         } catch (t: Throwable) {
             emptyList()
         }
     }
 
-    fun removeLocalesFromApk(inputApk: File, outputApk: File, localesToRemove: List<String>? = null): Int {
-        val apkModule = try {
-            ApkModule.loadApkFile(inputApk)
-        } catch (t: Throwable) {
-            throw IllegalStateException("Не удалось прочитать ресурсы APK: ${t.message}")
-        }
-        val tableBlock: TableBlock = try {
-            apkModule.tableBlock
-        } catch (t: Throwable) {
-            throw IllegalStateException("Не удалось прочитать ресурсы APK: ${t.message}")
-        } ?: throw IllegalStateException("В APK нет resources.arsc")
+    private const val ARSC_TABLE = 0x0002
+    private const val ARSC_PACKAGE = 0x0200
+    private const val ARSC_TYPE = 0x0201
 
-        val safeLocalesToRemove = localesToRemove
-            ?.filter { it.isNotEmpty() }
-            ?.toSet()
-
-        var count = 0
-
-        for (packageBlock in tableBlock.listPackages()) {
-            for (specTypePair in packageBlock.listSpecTypePairs()) {
-                val typeBlocksToRemove = mutableListOf<TypeBlock>()
-
-                for (typeBlock in specTypePair) {
-                    val qualifiers = typeBlock.resConfig.qualifiers
-                    if (qualifiers.isEmpty()) continue
-                    if (!isLanguageQualifier(qualifiers)) continue
-
-                    val shouldRemove = if (safeLocalesToRemove != null) {
-                        qualifiers in safeLocalesToRemove
+    private fun walkArscChunks(input: InputStream, available: Long, out: MutableSet<String>) {
+        var pos = 0L
+        val header = ByteArray(8)
+        while (pos + 8 <= available) {
+            readFullyExact(input, header)
+            val type = (header[0].toInt() and 0xFF) or ((header[1].toInt() and 0xFF) shl 8)
+            val headerSize = (header[2].toInt() and 0xFF) or ((header[3].toInt() and 0xFF) shl 8)
+            val size = (header[4].toLong() and 0xFF) or ((header[5].toLong() and 0xFF) shl 8) or
+                    ((header[6].toLong() and 0xFF) shl 16) or ((header[7].toLong() and 0xFF) shl 24)
+            if (size < 8 || headerSize < 8 || headerSize > size || size > available - pos) return
+            when (type) {
+                ARSC_TABLE, ARSC_PACKAGE -> {
+                    skipFullyExact(input, (headerSize - 8).toLong())
+                    walkArscChunks(input, size - headerSize, out)
+                }
+                ARSC_TYPE -> {
+                    val rest = ByteArray(16)
+                    readFullyExact(input, rest)
+                    val configSize = (rest[12].toLong() and 0xFF) or ((rest[13].toLong() and 0xFF) shl 8) or
+                            ((rest[14].toLong() and 0xFF) shl 16) or ((rest[15].toLong() and 0xFF) shl 24)
+                    if (configSize >= 4 && configSize <= 4096 && 20 + configSize <= size) {
+                        val cb = ByteArray(configSize.toInt())
+                        System.arraycopy(rest, 12, cb, 0, 4)
+                        readFullyExact(input, cb, 4, cb.size - 4)
+                        try {
+                            val cfg = ResConfig()
+                            cfg.readBytes(BlockReader(cb))
+                            val q = cfg.qualifiers
+                            if (isLanguageQualifier(q)) out.add(q)
+                        } catch (_: Throwable) { }
+                        skipFullyExact(input, size - 20 - configSize)
                     } else {
-                        true
-                    }
-
-                    if (shouldRemove) {
-                        typeBlocksToRemove.add(typeBlock)
+                        skipFullyExact(input, size - 20)
                     }
                 }
+                else -> skipFullyExact(input, size - 8)
+            }
+            pos += size
+        }
+    }
 
-                for (typeBlock in typeBlocksToRemove) {
-                    typeBlock.destroy()
-                    count++
+    private fun readFullyExact(input: InputStream, buf: ByteArray, off: Int = 0, len: Int = buf.size) {
+        var o = off
+        var l = len
+        while (l > 0) {
+            val r = input.read(buf, o, l)
+            if (r < 0) throw EOFException()
+            o += r
+            l -= r
+        }
+    }
+
+    private fun skipFullyExact(input: InputStream, n: Long) {
+        var left = n
+        val buf = ByteArray(1 shl 16)
+        while (left > 0) {
+            val r = input.read(buf, 0, minOf(buf.size.toLong(), left).toInt())
+            if (r < 0) throw EOFException()
+            left -= r
+        }
+    }
+
+    fun removeLocalesFromApk(inputApk: File, outputApk: File, localesToRemove: List<String>? = null): Int {
+        // Потоковое удаление локалей: пересобираем resources.arsc без выбранных языков
+        // (без загрузки ARSCLib-таблицы — на больших файлах она даёт OutOfMemoryError).
+        val safe = localesToRemove
+            ?.filter { it.isNotEmpty() }
+            ?.toSet()
+        val parent = outputApk.parentFile ?: inputApk.parentFile ?: File(".")
+        val tmpArsc = File(parent, outputApk.name + ".arsc.tmp")
+        try {
+            val removed = buildLocaleStrippedArsc(inputApk, tmpArsc, safe)
+            if (removed <= 0) return 0
+            val apkModule = ApkModule.loadApkFile(inputApk)
+            try {
+                apkModule.removeInputSource("resources.arsc")
+                val src = ByteInputSource(tmpArsc.readBytes(), "resources.arsc")
+                src.setMethod(java.util.zip.ZipEntry.STORED)
+                apkModule.add(src)
+                apkModule.writeApk(outputApk)
+            } finally {
+                apkModule.close()
+            }
+            android.util.Log.d("DexPatcher", "PATCH removed_locales=" + removed)
+            return removed
+        } catch (t: Throwable) {
+            throw IllegalStateException("Не удалось удалить локализации: ${t.message}")
+        } finally {
+            if (tmpArsc.exists()) tmpArsc.delete()
+        }
+    }
+
+    private fun buildLocaleStrippedArsc(inputApk: File, outArsc: File, safe: Set<String>?): Int {
+        val pkgRemovals = ArrayList<Long>()
+        var count = 0
+        var totalRemoved = 0L
+        var tableSize = 0L
+        ZipFile(inputApk).use { zf ->
+            val entry = zf.getEntry("resources.arsc") ?: return 0
+            tableSize = entry.size
+            zf.getInputStream(entry).use { raw ->
+                BufferedInputStream(raw, 1 shl 16).use { inn ->
+                    val res = measureArscRemovals(inn, entry.size, safe, pkgRemovals)
+                    count = res.first
+                    totalRemoved = res.second
                 }
             }
         }
-
-        tableBlock.refresh()
-        apkModule.writeApk(outputApk)
-        apkModule.close()
-        android.util.Log.d("DexPatcher", "PATCH replaced=" + count)
+        if (count <= 0 || totalRemoved <= 0L) return 0
+        ZipFile(inputApk).use { zf ->
+            val entry = zf.getEntry("resources.arsc") ?: return 0
+            zf.getInputStream(entry).use { raw ->
+                BufferedInputStream(raw, 1 shl 16).use { inn ->
+                    BufferedOutputStream(FileOutputStream(outArsc), 1 shl 16).use { out ->
+                        copyArscWithoutLocales(inn, tableSize, safe, pkgRemovals, totalRemoved, out)
+                    }
+                }
+            }
+        }
         return count
     }
 
+    private fun measureArscRemovals(input: InputStream, tableSize: Long, safe: Set<String>?, pkgRemovals: MutableList<Long>): Pair<Int, Long> {
+        var count = 0
+        var total = 0L
+        val h = ByteArray(8)
+        readFullyExact(input, h)
+        val ths = readU16(h, 2)
+        skipFullyExact(input, (ths - 8).toLong())
+        var pos = ths.toLong()
+        while (pos + 8 <= tableSize) {
+            readFullyExact(input, h)
+            val type = readU16(h, 0)
+            val hs = readU16(h, 2)
+            val size = readU32(h, 4)
+            if (size < 8 || hs < 8 || hs > size || size > tableSize - pos) break
+            if (type == ARSC_PACKAGE) {
+                var pkgRemoved = 0L
+                skipFullyExact(input, (hs - 8).toLong())
+                var pPos = hs.toLong()
+                while (pPos + 8 <= size) {
+                    readFullyExact(input, h)
+                    val pt = readU16(h, 0)
+                    val phs = readU16(h, 2)
+                    val psz = readU32(h, 4)
+                    if (psz < 8 || phs < 8 || phs > psz || psz > size - pPos) break
+                    if (pt == ARSC_TYPE) {
+                        if (readTypeChunkDecision(input, psz, safe)) {
+                            count++
+                            pkgRemoved += psz
+                        }
+                    } else {
+                        skipFullyExact(input, psz - 8)
+                    }
+                    pPos += psz
+                }
+                pkgRemovals.add(pkgRemoved)
+                total += pkgRemoved
+            } else {
+                skipFullyExact(input, size - 8)
+            }
+            pos += size
+        }
+        return Pair(count, total)
+    }
+
+    /** Читает type-чанк целиком; true = язык подходит под удаление. */
+    private fun readTypeChunkDecision(input: InputStream, size: Long, safe: Set<String>?): Boolean {
+        val rb = ByteArray(16)
+        readFullyExact(input, rb)
+        val configSize = readU32(rb, 12)
+        if (configSize < 4 || configSize > 4096 || 20 + configSize > size) {
+            skipFullyExact(input, maxOf(0L, size - 24))
+            return false
+        }
+        val cb = ByteArray(configSize.toInt())
+        System.arraycopy(rb, 12, cb, 0, 4)
+        readFullyExact(input, cb, 4, cb.size - 4)
+        skipFullyExact(input, size - 20 - configSize)
+        return try {
+            val cfg = ResConfig()
+            cfg.readBytes(BlockReader(cb))
+            val q = cfg.qualifiers
+            isLanguageQualifier(q) && (safe == null || q in safe)
+        } catch (t: Throwable) {
+            false
+        }
+    }
+
+    private fun copyArscWithoutLocales(
+        input: InputStream, tableSize: Long, safe: Set<String>?, pkgRemovals: List<Long>, totalRemoved: Long, out: OutputStream
+    ) {
+        val h = ByteArray(8)
+        readFullyExact(input, h)
+        val ths = readU16(h, 2)
+        writeChunkHeaderWithSize(out, h, tableSize - totalRemoved)
+        copyExact(input, out, (ths - 8).toLong())
+        var pos = ths.toLong()
+        var pi = 0
+        while (pos + 8 <= tableSize) {
+            readFullyExact(input, h)
+            val type = readU16(h, 0)
+            val hs = readU16(h, 2)
+            val size = readU32(h, 4)
+            if (size < 8 || hs < 8 || hs > size || size > tableSize - pos) return
+            if (type == ARSC_PACKAGE) {
+                val pkgRem = if (pi < pkgRemovals.size) pkgRemovals[pi] else 0L
+                pi++
+                writeChunkHeaderWithSize(out, h, size - pkgRem)
+                copyExact(input, out, (hs - 8).toLong())
+                var pPos = hs.toLong()
+                while (pPos + 8 <= size) {
+                    readFullyExact(input, h)
+                    val pt = readU16(h, 0)
+                    val phs = readU16(h, 2)
+                    val psz = readU32(h, 4)
+                    if (psz < 8 || phs < 8 || phs > psz || psz > size - pPos) break
+                    if (pt == ARSC_TYPE) {
+                        copyTypeChunk(input, out, h, psz, safe)
+                    } else {
+                        out.write(h)
+                        copyExact(input, out, psz - 8)
+                    }
+                    pPos += psz
+                }
+            } else {
+                out.write(h)
+                copyExact(input, out, size - 8)
+            }
+            pos += size
+        }
+    }
+
+    private fun copyTypeChunk(input: InputStream, out: OutputStream, h: ByteArray, size: Long, safe: Set<String>?) {
+        val rb = ByteArray(16)
+        readFullyExact(input, rb)
+        val configSize = readU32(rb, 12)
+        val valid = configSize >= 4 && configSize <= 4096 && 20 + configSize <= size
+        if (!valid) {
+            out.write(h)
+            out.write(rb)
+            copyExact(input, out, maxOf(0L, size - 24))
+            return
+        }
+        val cb = ByteArray(configSize.toInt())
+        System.arraycopy(rb, 12, cb, 0, 4)
+        readFullyExact(input, cb, 4, cb.size - 4)
+        val remove = try {
+            val cfg = ResConfig()
+            cfg.readBytes(BlockReader(cb))
+            val q = cfg.qualifiers
+            isLanguageQualifier(q) && (safe == null || q in safe)
+        } catch (t: Throwable) {
+            false
+        }
+        if (remove) {
+            skipFullyExact(input, size - 20 - configSize)
+        } else {
+            out.write(h)
+            out.write(rb)
+            out.write(cb, 4, cb.size - 4)
+            copyExact(input, out, size - 20 - configSize)
+        }
+    }
+
+    private fun writeChunkHeaderWithSize(out: OutputStream, header: ByteArray, newSize: Long) {
+        val x = header.copyOf()
+        x[4] = (newSize and 0xFF).toByte()
+        x[5] = ((newSize ushr 8) and 0xFF).toByte()
+        x[6] = ((newSize ushr 16) and 0xFF).toByte()
+        x[7] = ((newSize ushr 24) and 0xFF).toByte()
+        out.write(x)
+    }
+
+    private fun copyExact(input: InputStream, out: OutputStream, n: Long) {
+        var left = n
+        val buf = ByteArray(1 shl 16)
+        while (left > 0) {
+            val r = input.read(buf, 0, minOf(buf.size.toLong(), left).toInt())
+            if (r < 0) throw EOFException()
+            out.write(buf, 0, r)
+            left -= r
+        }
+    }
+    private const val ARSC_STRING_POOL = 0x0001
+
+    private class RawStringPool(
+        val data: ByteArray,
+        val headerSize: Int,
+        val stringCount: Int,
+        val stringsStart: Int,
+        val utf8: Boolean
+    ) {
+        fun string(index: Int): String? {
+            if (index < 0 || index >= stringCount || index >= 1_000_000) return null
+            if (headerSize + 4 * index + 4 > data.size) return null
+            return try {
+                val off = readU32(data, headerSize + 4 * index).toInt()
+                val s = stringsStart + off
+                if (s < 0 || s + 2 > data.size) return null
+                if (utf8) stringUtf8(s) else stringUtf16(s)
+            } catch (t: Throwable) {
+                null
+            }
+        }
+
+        private fun stringUtf8(s: Int): String {
+            val v1 = readLen8(s)
+            val n1 = if ((data[s].toInt() and 0x80) != 0) 2 else 1
+            if (s + n1 + v1 < data.size && data[s + n1 + v1].toInt() == 0) {
+                return String(data, s + n1, v1, Charsets.UTF_8)
+            }
+            val v2 = readLen8(s + n1)
+            val n2 = if ((data[s + n1].toInt() and 0x80) != 0) 2 else 1
+            val start = s + n1 + n2
+            var cnt = v2
+            if (start + cnt >= data.size || data[start + cnt].toInt() != 0) {
+                var z = start
+                val lim = minOf(data.size, start + 512)
+                while (z < lim && data[z].toInt() != 0) z++
+                cnt = z - start
+            }
+            if (cnt < 0 || start + cnt > data.size) return ""
+            return String(data, start, cnt, Charsets.UTF_8)
+        }
+
+        private fun stringUtf16(s: Int): String {
+            val v0 = readU16(data, s)
+            var len: Int
+            var pos: Int
+            if ((v0 and 0x8000) != 0) {
+                len = ((v0 and 0x7FFF) shl 16) or readU16(data, s + 2)
+                pos = s + 4
+            } else {
+                len = v0
+                pos = s + 2
+            }
+            if (len < 0 || pos + len * 2 > data.size) return ""
+            return String(data, pos, len * 2, Charsets.UTF_16LE)
+        }
+
+        private fun readLen8(pos: Int): Int {
+            val b0 = data[pos].toInt() and 0xFF
+            return if ((b0 and 0x80) != 0) ((b0 and 0x7F) shl 8) or (data[pos + 1].toInt() and 0xFF) else b0
+        }
+    }
+    private fun readU16(b: ByteArray, o: Int): Int =
+        (b[o].toInt() and 0xFF) or ((b[o + 1].toInt() and 0xFF) shl 8)
+
+    private fun readU32(b: ByteArray, o: Int): Long =
+        (b[o].toLong() and 0xFF) or ((b[o + 1].toLong() and 0xFF) shl 8) or
+        ((b[o + 2].toLong() and 0xFF) shl 16) or ((b[o + 3].toLong() and 0xFF) shl 24)
+
+    fun readDefaultStringValues(apkFile: File, needles: List<String>, maxCount: Int): List<String> {
+        val found = ArrayList<String>()
+        val seen = HashSet<String>()
+        try {
+            ZipFile(apkFile).use { zf ->
+                val entry = zf.getEntry("resources.arsc") ?: return emptyList()
+                zf.getInputStream(entry).use { raw ->
+                    BufferedInputStream(raw, 1 shl 16).use { input ->
+                        val gpHolder = arrayOfNulls<RawStringPool>(1)
+                        walkArscStrings(input, 0L, entry.size, -1L, needles, found, seen, gpHolder, maxCount)
+                    }
+                }
+            }
+        } catch (t: Throwable) {
+            // возвращаем частичный результат
+        }
+        return found
+    }
+
+    private fun walkArscStrings(
+        input: InputStream, startAbs: Long, available: Long, pkgStart: Long,
+        needles: List<String>, found: MutableList<String>, seen: MutableSet<String>,
+        gpHolder: Array<RawStringPool?>, maxCount: Int
+    ) {
+        var pos = 0L
+        val header = ByteArray(8)
+        while (pos + 8 <= available && found.size < maxCount) {
+            val chunkStart = startAbs + pos
+            readFullyExact(input, header)
+            val type = (header[0].toInt() and 0xFF) or ((header[1].toInt() and 0xFF) shl 8)
+            val headerSize = (header[2].toInt() and 0xFF) or ((header[3].toInt() and 0xFF) shl 8)
+            val size = (header[4].toLong() and 0xFF) or ((header[5].toLong() and 0xFF) shl 8) or
+                    ((header[6].toLong() and 0xFF) shl 16) or ((header[7].toLong() and 0xFF) shl 24)
+            if (size < 8 || headerSize < 8 || headerSize > size || size > available - pos) return
+            when (type) {
+                ARSC_TABLE -> {
+                    skipFullyExact(input, (headerSize - 8).toLong())
+                    walkArscStrings(input, chunkStart + headerSize, size - headerSize, -1L, needles, found, seen, gpHolder, maxCount)
+                }
+                ARSC_PACKAGE -> {
+                    val toRead = minOf(headerSize - 8, 280)
+                    val ph = ByteArray(toRead)
+                    readFullyExact(input, ph)
+                    if (headerSize - 8 > toRead) skipFullyExact(input, (headerSize - 8 - toRead).toLong())
+                    if (toRead >= 264) {
+                        val typeStringsOff = readU32(ph, 260)
+                        val typeIdOffset = if (headerSize >= 288) readU32(ph, 276) else 0L
+                        walkArscPackageStrings(
+                            input, chunkStart + headerSize, size - headerSize, chunkStart,
+                            typeStringsOff, typeIdOffset, needles, found, seen, gpHolder, maxCount
+                        )
+                    } else {
+                        skipFullyExact(input, (size - 8 - toRead).toLong())
+                    }
+                }
+                ARSC_STRING_POOL -> {
+                    if (pkgStart < 0 && gpHolder[0] == null) {
+                        gpHolder[0] = readPoolFully(input, size, header)
+                    } else {
+                        skipFullyExact(input, size - 8)
+                    }
+                }
+                else -> skipFullyExact(input, size - 8)
+            }
+            pos += size
+        }
+    }
+
+    private fun readPoolFully(input: InputStream, chunkSize: Long, h8: ByteArray): RawStringPool? {
+        val restLen = chunkSize - 8
+        if (restLen < 0 || restLen > 64L * 1024 * 1024) {
+            if (restLen > 0) skipFullyExact(input, restLen)
+            return null
+        }
+        val data = ByteArray(chunkSize.toInt())
+        System.arraycopy(h8, 0, data, 0, 8)
+        readFullyExact(input, data, 8, data.size - 8)
+        val headerSize = readU16(data, 2)
+        val stringCount = readU32(data, 8).toInt()
+        val flags = readU32(data, 16).toInt()
+        val stringsStart = readU32(data, 20).toInt()
+        val utf8 = (flags and 0x100) != 0
+        return RawStringPool(data, headerSize, stringCount, stringsStart, utf8)
+    }
+
+    private fun walkArscPackageStrings(
+        input: InputStream, startAbs: Long, available: Long, pkgStart: Long,
+        typeStringsOff: Long, typeIdOffset: Long,
+        needles: List<String>, found: MutableList<String>, seen: MutableSet<String>,
+        gpHolder: Array<RawStringPool?>, maxCount: Int
+    ) {
+        var pos = 0L
+        var stringTypeId = 0L
+        val header = ByteArray(8)
+        while (pos + 8 <= available) {
+            val chunkStart = startAbs + pos
+            readFullyExact(input, header)
+            val type = (header[0].toInt() and 0xFF) or ((header[1].toInt() and 0xFF) shl 8)
+            val headerSize = (header[2].toInt() and 0xFF) or ((header[3].toInt() and 0xFF) shl 8)
+            val size = (header[4].toLong() and 0xFF) or ((header[5].toLong() and 0xFF) shl 8) or
+                    ((header[6].toLong() and 0xFF) shl 16) or ((header[7].toLong() and 0xFF) shl 24)
+            if (size < 8 || headerSize < 8 || headerSize > size || size > available - pos) return
+            when {
+                type == ARSC_STRING_POOL && chunkStart == pkgStart + typeStringsOff -> {
+                    val tp = readPoolFully(input, size, header)
+                    if (tp != null) {
+                        var i = 0
+                        while (i < tp.stringCount) {
+                            if (tp.string(i) == "string") {
+                                stringTypeId = i + 1 + typeIdOffset
+                                break
+                            }
+                            i++
+                        }
+                    }
+                }
+                type == ARSC_TYPE -> {
+                    val rb = ByteArray(16)
+                    readFullyExact(input, rb)
+                    val id = (rb[0].toInt() and 0xFF).toLong()
+                    val flags0 = rb[1].toInt() and 0xFF
+                    val configSize = readU32(rb, 12)
+                    val validConfig = configSize >= 4 && configSize <= 4096 && 20 + configSize <= size
+                    if (stringTypeId > 0 && id == stringTypeId && (flags0 and 0x03) == 0 && validConfig) {
+                        val cb = ByteArray(configSize.toInt())
+                        System.arraycopy(rb, 12, cb, 0, 4)
+                        readFullyExact(input, cb, 4, cb.size - 4)
+                        var isDefault = true
+                        var k = 4
+                        while (k < cb.size) {
+                            if (cb[k].toInt() != 0) { isDefault = false; break }
+                            k++
+                        }
+                        val entryCount = readU32(rb, 4)
+                        val entriesStart = readU32(rb, 8)
+                        if (isDefault && entryCount <= 2_000_000) {
+                            val offBytes = entryCount * 4
+                            val rem = size - (20 + configSize + offBytes)
+                            if (rem >= 0 && rem <= 32L * 1024 * 1024) {
+                                val offs = ByteArray(offBytes.toInt())
+                                readFullyExact(input, offs)
+                                val body = ByteArray(rem.toInt())
+                                readFullyExact(input, body)
+                                val bodyAbsStart = chunkStart + 20 + configSize + offBytes
+                                val gp = gpHolder[0]
+                                var i = 0L
+                                while (i < entryCount && found.size < maxCount) {
+                                    val o = readU32(offs, (4 * i).toInt())
+                                    i++
+                                    if (o == 0xFFFFFFFFL) continue
+                                    val bi = (chunkStart + entriesStart + o - bodyAbsStart).toInt()
+                                    if (bi < 0 || bi + 16 > body.size) continue
+                                    val eflags = readU16(body, bi + 2)
+                                    if ((eflags and 0x0001) != 0) continue
+                                    val vtype = body[bi + 11].toInt() and 0xFF
+                                    if (vtype != 0x03) continue
+                                    val sidx = readU32(body, bi + 12).toInt()
+                                    val v = gp?.string(sidx) ?: continue
+                                    if (v.length in 2..60) {
+                                        val low = v.lowercase()
+                                        for (n in needles) {
+                                            if (low.contains(n)) {
+                                                if (seen.add(v)) found.add(v)
+                                                break
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                skipFullyExact(input, size - 20 - configSize)
+                            }
+                        } else {
+                            skipFullyExact(input, size - 20 - configSize)
+                        }
+                    } else {
+                        skipFullyExact(input, maxOf(0L, size - 24))
+                    }
+                }
+                else -> skipFullyExact(input, size - 8)
+            }
+            pos += size
+        }
+    }
     private fun isLanguageQualifier(qualifiers: String): Boolean {
         if (qualifiers.isEmpty()) return false
         val clean = qualifiers.trimStart('-')
@@ -649,7 +1229,8 @@ fun patchPackageName(inputDex: File, outputDex: File, oldPackage: String, newPac
         "xh",
         "yi","yo",
         "za","zh","zu",
-        "in","iw","ji"
+        "in","iw","ji",
+        "bho","ceb","ckb","doi","fil","haw","hmn","ilo","jw","kri","lus","mai","nso","phi"
     )
 
     // ============================================================
