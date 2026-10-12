@@ -19,6 +19,7 @@ import org.jf.dexlib2.iface.reference.MethodReference
 import org.jf.dexlib2.iface.reference.StringReference
 import org.jf.dexlib2.iface.reference.TypeReference
 import java.io.File
+import java.security.MessageDigest
 
 object DexComparer {
 
@@ -42,14 +43,37 @@ object DexComparer {
 
     data class ChangedClass(val type: String, val kind: ChangeKind)
 
-    fun compare(apkA: File, apkB: File, workDir: File, ignoreDebug: Boolean, ignoreNop: Boolean, ignoreAdCalls: Boolean, ignoreAnalytics: Boolean): List<ChangedClass> {
+    /** Гроверный примитивный буфер подписей (без боксинга Long — в разы меньше мусора). */
+    private class LongSig {
+        var array = LongArray(128)
+        var size = 0
+
+        fun add(v: Long) {
+            if (size == array.size) array = array.copyOf(array.size * 2)
+            array[size++] = v
+        }
+
+        fun sameAs(other: LongSig): Boolean {
+            if (size != other.size) return false
+            for (i in 0 until size) if (array[i] != other.array[i]) return false
+            return true
+        }
+    }
+
+    private fun compareLegacy(apkA: File, apkB: File, workDir: File, ignoreDebug: Boolean, ignoreNop: Boolean, ignoreAdCalls: Boolean, ignoreAnalytics: Boolean): List<ChangedClass> {
         val opcodes = Opcodes.forApi(28)
-        val classesA = loadClasses(apkA, File(workDir, "a"), opcodes)
-        val classesB = loadClasses(apkB, File(workDir, "b"), opcodes)
+        val maps = loadBoth(apkA, apkB, workDir, opcodes)
+        val classesA = maps.first
+        val classesB = maps.second
         val result = mutableListOf<ChangedClass>()
-        for (type in (classesA.keys + classesB.keys).toSortedSet()) {
+        val allTypes = java.util.TreeSet<String>()
+        allTypes.addAll(classesA.keys)
+        allTypes.addAll(classesB.keys)
+        for (type in allTypes) {
             val ca = classesA[type]
             val cb = classesB[type]
+            // ⚡ Классы из байт-идентичных dex переиспользованы — сравнивать нечего
+            if (ca != null && ca === cb) continue
             if (ignoreAdCalls) {
                 if (ca != null && DexPatcher.hasAdCalls(ca)) continue
                 if (cb != null && DexPatcher.hasAdCalls(cb)) continue
@@ -69,12 +93,121 @@ object DexComparer {
         return result
     }
 
+    fun compare(apkA: File, apkB: File, workDir: File, ignoreDebug: Boolean, ignoreNop: Boolean, ignoreAdCalls: Boolean, ignoreAnalytics: Boolean): List<ChangedClass> {
+        if (ignoreDebug && !ignoreAdCalls && !ignoreAnalytics) {
+            try {
+                return compareFast(apkA, apkB, workDir, ignoreNop)
+            } catch (_: Throwable) {
+                // аварийный откат на полный dexlib2-путь
+            }
+        }
+        return compareLegacy(apkA, apkB, workDir, ignoreDebug, ignoreNop, ignoreAdCalls, ignoreAnalytics)
+    }
+
+    /**
+     * ⚡ Быстрый путь: подписи классов считает FastDexSig (без dexlib2-объектов),
+     * байт-идентичные (по MD5) dex-файлы переиспользуются без сканирования.
+     */
+    private fun compareFast(apkA: File, apkB: File, workDir: File, ignoreNop: Boolean): List<ChangedClass> {
+        val dirA = File(workDir, "a")
+        dirA.mkdirs()
+        val dirB = File(workDir, "b")
+        dirB.mkdirs()
+        val dexesA = ApkUtils.extractAllDex(apkA, dirA)
+        val dexesB = ApkUtils.extractAllDex(apkB, dirB)
+        val hashA = HashMap<String, String>()
+        for (f in dexesA) hashA[f.name] = fileHash(f)
+        val hashB = HashMap<String, String>()
+        for (f in dexesB) hashB[f.name] = fileHash(f)
+
+        val scanners = HashMap<String, FastDexSig>()
+        val typeDexA = HashMap<String, String>()
+        val typeDexB = HashMap<String, String>()
+        try {
+            for (f in dexesA) {
+                val s = FastDexSig(f)
+                scanners["A/" + f.name] = s
+                s.forEachClassType { ty -> typeDexA[ty] = f.name }
+                f.delete()
+            }
+            for (f in dexesB) {
+                if (hashA[f.name] != null && hashA[f.name] == hashB[f.name]) {
+                    f.delete()
+                    continue
+                }
+                val s = FastDexSig(f)
+                scanners["B/" + f.name] = s
+                s.forEachClassType { ty -> typeDexB[ty] = f.name }
+                f.delete()
+            }
+            for ((ty, dexName) in typeDexA) {
+                if (hashA[dexName] != null && hashA[dexName] == hashB[dexName] && !typeDexB.containsKey(ty)) {
+                    typeDexB[ty] = dexName
+                }
+            }
+            val result = mutableListOf<ChangedClass>()
+            val allTypes = java.util.TreeSet<String>()
+            allTypes.addAll(typeDexA.keys)
+            allTypes.addAll(typeDexB.keys)
+            for (type in allTypes) {
+                val da = typeDexA[type]
+                val db = typeDexB[type]
+                // классы байт-идентичного dex не изменились
+                if (da != null && da == db && hashA[da] != null && hashA[da] == hashB[db]) continue
+                val ca = da?.let { scanners["A/" + it] }?.classSignature(type)
+                val cb = db?.let { scanners["B/" + it] }?.classSignature(type)
+                val changed = if (ca != null && cb != null) {
+                    if (ignoreNop) !sigEqIgnoringNop(ca, cb) else !sigSame(ca, cb)
+                } else false
+                val kind = when {
+                    ca == null && cb == null -> null
+                    ca == null -> ChangeKind.ADDED
+                    cb == null -> ChangeKind.REMOVED
+                    changed -> ChangeKind.CHANGED
+                    else -> null
+                }
+                if (kind != null) result.add(ChangedClass(type, kind))
+            }
+            return result
+        } finally {
+            scanners.values.forEach { runCatching { it.close() } }
+        }
+    }
+
+    private fun sigSame(a: FastDexSig.LongSig, b: FastDexSig.LongSig): Boolean {
+        if (a.size != b.size) return false
+        for (i in 0 until a.size) if (a.array[i] != b.array[i]) return false
+        return true
+    }
+
+    private fun sigEqIgnoringNop(a: FastDexSig.LongSig, b: FastDexSig.LongSig): Boolean {
+        var i = 0
+        var j = 0
+        val aa = a.array
+        val bb = b.array
+        while (i < a.size && j < b.size) {
+            if (aa[i] == bb[j]) { i++; j++; continue }
+            if (!isNopSig(aa[i]) && !isNopSig(bb[j])) return false
+            var ii = i
+            while (ii < a.size && isNopSig(aa[ii])) ii++
+            if (ii < a.size && aa[ii] == bb[j]) { i = ii; continue }
+            var jj = j
+            while (jj < b.size && isNopSig(bb[jj])) jj++
+            if (jj < b.size && aa[i] == bb[jj]) { j = jj; continue }
+            i++
+            j++
+        }
+        while (i < a.size) { if (!isNopSig(aa[i])) return false; i++ }
+        while (j < b.size) { if (!isNopSig(bb[j])) return false; j++ }
+        return true
+    }
+
+    private fun isNopSig(v: Long): Boolean = v == Long.MIN_VALUE
     fun diffClass(apkA: File, apkB: File, type: String, workDir: File, ignoreDebug: Boolean): DiffResult {
         val opcodes = Opcodes.forApi(28)
-        val classesA = loadClasses(apkA, File(workDir, "a"), opcodes)
-        val classesB = loadClasses(apkB, File(workDir, "b"), opcodes)
-        val ca = classesA[type]
-        val cb = classesB[type]
+        val maps = loadBoth(apkA, apkB, workDir, opcodes)
+        val ca = maps.first[type]
+        val cb = maps.second[type]
         val ta = ca?.let { classToText(it, ignoreDebug) } ?: emptyList()
         val tb = cb?.let { classToText(it, ignoreDebug) } ?: emptyList()
         return DiffResult(diffLines(ta, tb, 1, 1))
@@ -87,46 +220,52 @@ object DexComparer {
     private fun isClassChanged(ca: ClassDef, cb: ClassDef, ignoreDebug: Boolean, ignoreNop: Boolean): Boolean {
         val sa = classSignature(ca, ignoreDebug)
         val sb = classSignature(cb, ignoreDebug)
-        return if (ignoreNop) !equalIgnoringNop(sa, sb) else sa != sb
+        return if (ignoreNop) !equalIgnoringNop(sa, sb) else !sa.sameAs(sb)
     }
 
-    private fun equalIgnoringNop(a: List<Long>, b: List<Long>): Boolean {
+    private fun equalIgnoringNop(a: LongSig, b: LongSig): Boolean {
         var i = 0
         var j = 0
+        val aa = a.array
+        val bb = b.array
         while (i < a.size && j < b.size) {
-            if (a[i] == b[j]) { i++; j++; continue }
-            if (!isNopSignature(a[i]) && !isNopSignature(b[j])) return false
+            if (aa[i] == bb[j]) { i++; j++; continue }
+            if (!isNopSignature(aa[i]) && !isNopSignature(bb[j])) return false
 
             var ii = i
-            while (ii < a.size && isNopSignature(a[ii])) ii++
-            if (ii < a.size && a[ii] == b[j]) { i = ii; continue }
+            while (ii < a.size && isNopSignature(aa[ii])) ii++
+            if (ii < a.size && aa[ii] == bb[j]) { i = ii; continue }
 
             var jj = j
-            while (jj < b.size && isNopSignature(b[jj])) jj++
-            if (jj < b.size && a[i] == b[jj]) { j = jj; continue }
+            while (jj < b.size && isNopSignature(bb[jj])) jj++
+            if (jj < b.size && aa[i] == bb[jj]) { j = jj; continue }
 
             i++
             j++
         }
-        while (i < a.size) { if (!isNopSignature(a[i])) return false; i++ }
-        while (j < b.size) { if (!isNopSignature(b[j])) return false; j++ }
+        while (i < a.size) { if (!isNopSignature(aa[i])) return false; i++ }
+        while (j < b.size) { if (!isNopSignature(bb[j])) return false; j++ }
         return true
     }
 
     private fun isNopSignature(sig: Long): Boolean = sig == NOP_MARKER
 
-    private fun classSignature(classDef: ClassDef, ignoreDebug: Boolean): List<Long> {
-        val sig = mutableListOf<Long>()
+    private fun classSignature(classDef: ClassDef, ignoreDebug: Boolean): LongSig {
+        val sig = LongSig()
         sig.add(classDef.type.hashCode().toLong())
+        sig.add((classDef.superclass ?: "").hashCode().toLong())
+        for (iface in classDef.interfaces) sig.add(iface.hashCode().toLong())
         val fields = (classDef.staticFields + classDef.instanceFields).sortedBy { it.name }
         for (field in fields) {
             sig.add(field.name.hashCode().toLong() * 31 + field.type.hashCode())
         }
         val methods = (classDef.directMethods + classDef.virtualMethods)
-            .sortedBy { it.name + it.parameterTypes.joinToString("") + it.returnType }
+            .map { it to (it.name + it.parameterTypes.joinToString("") + it.returnType) }
+            .sortedBy { it.second }
+            .map { it.first }
         for (method in methods) {
             var mh = method.name.hashCode().toLong()
-            for (p in method.parameterTypes) mh = mh * 31 + p.toString().hashCode()
+            for (p in method.parameterTypes) mh = mh * 31 + p.hashCode()
             mh = mh * 31 + method.returnType.hashCode()
             sig.add(mh)
             val impl = method.implementation
@@ -150,7 +289,7 @@ object DexComparer {
             val op = instr.opcode
             if (op == Opcode.MOVE || op == Opcode.MOVE_OBJECT || op == Opcode.MOVE_WIDE) return NOP_MARKER
         }
-        var h = instr.opcode.name.hashCode().toLong()
+        var h = instr.opcode.ordinal.toLong()
         if (instr is OneRegisterInstruction) h = h * 31 + instr.registerA
         if (instr is TwoRegisterInstruction) h = h * 31 + instr.registerA * 997 + instr.registerB
         if (instr is ThreeRegisterInstruction) h = h * 31 + instr.registerA * 994009 + instr.registerB * 997 + instr.registerC
@@ -169,17 +308,74 @@ object DexComparer {
         return h
     }
 
-    private fun loadClasses(apk: File, dir: File, opcodes: Opcodes): Map<String, ClassDef> {
-        dir.mkdirs()
-        val map = sortedMapOf<String, ClassDef>()
-        val dexFiles = ApkUtils.extractAllDex(apk, dir)
-        for (dexFile in dexFiles) {
-            val dex = DexFileFactory.loadDexFile(dexFile, opcodes)
-            for (c in dex.classes) map[c.type] = c
-            dexFile.delete()
+    /**
+     * Загружает классы обоих APK. Dex-файлы, совпадающие по имени и содержимому (MD5),
+     * переиспользуют объекты из A — для типичных сравнений (изменена пара dex) это
+     * убирает почти всю работу.
+     */
+    private fun loadBoth(apkA: File, apkB: File, workDir: File, opcodes: Opcodes): Pair<Map<String, ClassDef>, Map<String, ClassDef>> {
+        val dirA = File(workDir, "a")
+        dirA.mkdirs()
+        val dirB = File(workDir, "b")
+        dirB.mkdirs()
+        val dexesA = ApkUtils.extractAllDex(apkA, dirA)
+        val dexesB = ApkUtils.extractAllDex(apkB, dirB)
+
+        val hashA = HashMap<String, String>()
+        for (f in dexesA) hashA[f.name] = fileHash(f)
+        val hashB = HashMap<String, String>()
+        for (f in dexesB) hashB[f.name] = fileHash(f)
+
+        val mapA = HashMap<String, ClassDef>()
+        val mapB = HashMap<String, ClassDef>()
+        val typesInDexA = HashMap<String, List<String>>()
+        for (f in dexesA) {
+            val dex = DexFileFactory.loadDexFile(f, opcodes)
+            val list = ArrayList<String>()
+            for (c in dex.classes) {
+                mapA[c.type] = c
+                list.add(c.type)
+            }
+            typesInDexA[f.name] = list
+            f.delete()
         }
-        return map
+        for (f in dexesB) {
+            if (hashA[f.name] != null && hashA[f.name] == hashB[f.name]) {
+                // dex байт-в-байт совпадает с таким же из A — переиспользуем классы
+                for (t in typesInDexA[f.name] ?: emptyList<String>()) {
+                    val cd = mapA[t]
+                    if (cd != null) mapB[t] = cd
+                }
+                f.delete()
+                continue
+            }
+            val dex = DexFileFactory.loadDexFile(f, opcodes)
+            for (c in dex.classes) mapB[c.type] = c
+            f.delete()
+        }
+        return mapA to mapB
     }
+
+    private fun fileHash(f: File): String {
+        val md = MessageDigest.getInstance("MD5")
+        f.inputStream().buffered(1 shl 16).use { ins ->
+            val buf = ByteArray(1 shl 16)
+            while (true) {
+                val r = ins.read(buf)
+                if (r <= 0) break
+                md.update(buf, 0, r)
+            }
+        }
+        val d = md.digest()
+        val sb = StringBuilder(d.size * 2)
+        for (b in d) {
+            val v = b.toInt() and 0xFF
+            sb.append(HEX[v ushr 4]).append(HEX[v and 0xF])
+        }
+        return sb.toString()
+    }
+
+    private val HEX = "0123456789abcdef".toCharArray()
 
     private fun classToText(classDef: ClassDef, ignoreDebug: Boolean): List<String> {
         val lines = mutableListOf<String>()

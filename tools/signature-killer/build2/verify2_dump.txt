@@ -1,0 +1,101 @@
+CLASS Llazy/sign/KillerApplication; super=Landroid/app/Application; src=KillerApplication.java
+== METHOD <clinit> params=[] ret=V
+   registers=1 (p0..)
+   [0] invoke-static Llazy/sign/KillerApplication;->install()V [35c cnt=0 c=0 d=0 e=0 f=0 g=0]
+   [1] goto off=2
+   [2] move-exception a=0
+   [3] return-void
+== METHOD <init> params=[] ret=V
+   registers=1 (p0..)
+   [0] invoke-direct Landroid/app/Application;-><init>()V [35c cnt=1 c=0 d=0 e=0 f=0 g=0]
+   [1] return-void
+== METHOD clearMap params=[Ljava/lang/reflect/Field;] ret=V
+   registers=2 (p0..)
+   [0] const/4 a=0
+   [1] invoke-virtual Ljava/lang/reflect/Field;->get(Ljava/lang/Object;)Ljava/lang/Object; [35c cnt=2 c=1 d=0 e=0 f=0 g=0]
+   [2] move-result-object a=1
+   [3] instance-of Ljava/util/Map; a=0 b=1
+   [4] if-eqz a=0 off=7
+   [5] check-cast Ljava/util/Map; a=1
+   [6] invoke-interface Ljava/util/Map;->clear()V [35c cnt=1 c=1 d=0 e=0 f=0 g=0]
+   [7] return-void
+== METHOD findField params=[Ljava/lang/Class;, Ljava/lang/String;] ret=Ljava/lang/reflect/Field;
+   registers=4 (p0..)
+   [0] nop
+   [1] if-eqz a=2 off=21
+   [2] const-class Ljava/lang/Object; a=0
+   [3] if-eq a=2 b=0 off=17
+   [4] invoke-virtual Ljava/lang/Class;->getDeclaredField(Ljava/lang/String;)Ljava/lang/reflect/Field; [35c cnt=2 c=2 d=3 e=0 f=0 g=0]
+   [5] move-result-object a=0
+   [6] const/4 a=1
+   [7] invoke-virtual Ljava/lang/reflect/Field;->setAccessible(Z)V [35c cnt=2 c=0 d=1 e=0 f=0 g=0]
+   [8] return-object a=0
+   [9] move-exception a=0
+   [10] invoke-virtual Ljava/lang/Class;->getSuperclass()Ljava/lang/Class; [35c cnt=1 c=2 d=0 e=0 f=0 g=0]
+   [11] move-result-object a=2
+   [12] goto off=-20
+   [13] new-instance Ljava/lang/NoSuchFieldException; a=2
+   [14] invoke-direct Ljava/lang/NoSuchFieldException;-><init>(Ljava/lang/String;)V [35c cnt=2 c=2 d=3 e=0 f=0 g=0]
+   [15] throw a=2
+== METHOD install params=[] ret=V
+   registers=7 (p0..)
+   [0] const-string Landroid/app a=0
+   [1] const-string Landroid/os/Parcel a=1
+   [2] const-string Landroid/content/pm a=2
+   [3] filled-new-array [Ljava/lang/String; [35c cnt=3 c=0 d=1 e=2 f=0 g=0]
+   [4] move-result-object a=0
+   [5] invoke-static Lorg/lsposed/hiddenapibypass/HiddenApiBypass;->addHiddenApiExemptions([Ljava/lang/String;)Z [35c cnt=1 c=0 d=0 e=0 f=0 g=0]
+   [6] goto off=2
+   [7] move-exception a=0
+   [8] new-instance Landroid/content/pm/Signature; a=0
+   [9] const-string __LM_CERT_B64__ a=1
+   [10] const/4 a=2
+   [11] invoke-static Landroid/util/Base64;->decode(Ljava/lang/String;I)[B [35c cnt=2 c=1 d=2 e=0 f=0 g=0]
+   [12] move-result-object a=1
+   [13] invoke-direct Landroid/content/pm/Signature;-><init>([B)V [35c cnt=2 c=0 d=1 e=0 f=0 g=0]
+   [14] const/4 a=1
+   [15] const-class Landroid/content/pm/PackageInfo; a=3
+   [16] const-string CREATOR a=4
+   [17] invoke-static Llazy/sign/KillerApplication;->findField(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/reflect/Field; [35c cnt=2 c=3 d=4 e=0 f=0 g=0]
+   [18] move-result-object a=3
+   [19] invoke-virtual Ljava/lang/reflect/Field;->get(Ljava/lang/Object;)Ljava/lang/Object; [35c cnt=2 c=3 d=1 e=0 f=0 g=0]
+   [20] move-result-object a=4
+   [21] instance-of Landroid/os/Parcelable$Creator; a=5 b=4
+   [22] if-eqz a=5 off=14
+   [23] new-instance Llazy/sign/KillerApplication$CreatorWrapper; a=5
+   [24] check-cast Landroid/os/Parcelable$Creator; a=4
+   [25] const-string __LM_TARGET_PKG__ a=6
+   [26] invoke-direct Llazy/sign/KillerApplication$CreatorWrapper;-><init>(Landroid/os/Parcelable$Creator;Ljava/lang/String;Landroid/content/pm/Signature;)V [35c cnt=4 c=5 d=4 e=6 f=0 g=0]
+   [27] invoke-virtual Ljava/lang/reflect/Field;->set(Ljava/lang/Object;Ljava/lang/Object;)V [35c cnt=3 c=3 d=1 e=5 f=0 g=0]
+   [28] goto off=2
+   [29] move-exception a=0
+   [30] const-class Landroid/os/Parcel; a=0
+   [31] const-string mCreators a=3
+   [32] invoke-static Llazy/sign/KillerApplication;->findField(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/reflect/Field; [35c cnt=2 c=0 d=3 e=0 f=0 g=0]
+   [33] move-result-object a=0
+   [34] invoke-static Llazy/sign/KillerApplication;->clearMap(Ljava/lang/reflect/Field;)V [35c cnt=1 c=0 d=0 e=0 f=0 g=0]
+   [35] const-class Landroid/os/Parcel; a=0
+   [36] const-string sPairedCreators a=3
+   [37] invoke-static Llazy/sign/KillerApplication;->findField(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/reflect/Field; [35c cnt=2 c=0 d=3 e=0 f=0 g=0]
+   [38] move-result-object a=0
+   [39] invoke-static Llazy/sign/KillerApplication;->clearMap(Ljava/lang/reflect/Field;)V [35c cnt=1 c=0 d=0 e=0 f=0 g=0]
+   [40] goto off=2
+   [41] move-exception a=0
+   [42] const-class Landroid/content/pm/PackageManager; a=0
+   [43] const-string sPackageInfoCache a=3
+   [44] invoke-static Llazy/sign/KillerApplication;->findField(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/reflect/Field; [35c cnt=2 c=0 d=3 e=0 f=0 g=0]
+   [45] move-result-object a=0
+   [46] invoke-virtual Ljava/lang/reflect/Field;->get(Ljava/lang/Object;)Ljava/lang/Object; [35c cnt=2 c=0 d=1 e=0 f=0 g=0]
+   [47] move-result-object a=0
+   [48] if-eqz a=0 off=19
+   [49] invoke-virtual Ljava/lang/Object;->getClass()Ljava/lang/Class; [35c cnt=1 c=0 d=0 e=0 f=0 g=0]
+   [50] move-result-object a=1
+   [51] const-string clear a=3
+   [52] new-array [Ljava/lang/Class; a=4 b=2
+   [53] invoke-virtual Ljava/lang/Class;->getMethod(Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method; [35c cnt=3 c=1 d=3 e=4 f=0 g=0]
+   [54] move-result-object a=1
+   [55] new-array [Ljava/lang/Object; a=2 b=2
+   [56] invoke-virtual Ljava/lang/reflect/Method;->invoke(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object; [35c cnt=3 c=1 d=0 e=2 f=0 g=0]
+   [57] goto off=2
+   [58] move-exception a=0
+   [59] return-void

@@ -36,6 +36,7 @@ class PatchActivity : AppCompatActivity() {
     private lateinit var checkBoxRemoveAnalytics: MaterialButton
     private lateinit var checkBoxRemoveGPServices: MaterialButton
     private lateinit var checkBoxRemoveVpn: MaterialButton
+    private lateinit var checkBoxAllowScreenshots: MaterialButton
     private lateinit var checkBoxRemoveInstallerCheck: MaterialButton
     private lateinit var checkBoxRemoveUpdate: MaterialButton
     private lateinit var checkBoxRemoveLocales: MaterialButton
@@ -94,6 +95,7 @@ class PatchActivity : AppCompatActivity() {
         checkBoxRemoveAnalytics = findViewById(R.id.checkBoxRemoveAnalytics)
         checkBoxRemoveGPServices = findViewById(R.id.checkBoxRemoveGPServices)
         checkBoxRemoveVpn = findViewById(R.id.checkBoxRemoveVpn)
+        checkBoxAllowScreenshots = findViewById(R.id.checkBoxAllowScreenshots)
         checkBoxRemoveInstallerCheck = findViewById(R.id.checkBoxRemoveInstallerCheck)
         checkBoxRemoveUpdate = findViewById(R.id.checkBoxRemoveUpdate)
         checkBoxRemoveLocales = findViewById(R.id.checkBoxRemoveLocales)
@@ -206,6 +208,7 @@ class PatchActivity : AppCompatActivity() {
         checkBoxRemoveAnalytics.addOnCheckedChangeListener(listener)
         checkBoxRemoveGPServices.addOnCheckedChangeListener(listener)
         checkBoxRemoveVpn.addOnCheckedChangeListener(listener)
+        checkBoxAllowScreenshots.addOnCheckedChangeListener(listener)
         checkBoxRemoveInstallerCheck.addOnCheckedChangeListener(listener)
         checkBoxRemoveUpdate.addOnCheckedChangeListener(listener)
         checkBoxRemoveLocales.addOnCheckedChangeListener(listener)
@@ -219,6 +222,7 @@ class PatchActivity : AppCompatActivity() {
         checkBoxRemoveAnalytics.setToggleCheckedStateOnClick(true)
         checkBoxRemoveGPServices.setToggleCheckedStateOnClick(true)
         checkBoxRemoveVpn.setToggleCheckedStateOnClick(true)
+        checkBoxAllowScreenshots.setToggleCheckedStateOnClick(true)
         checkBoxRemoveInstallerCheck.setToggleCheckedStateOnClick(true)
         checkBoxRemoveUpdate.setToggleCheckedStateOnClick(true)
         checkBoxRemoveLocales.setToggleCheckedStateOnClick(true)
@@ -228,7 +232,7 @@ class PatchActivity : AppCompatActivity() {
 
         for (b in listOf(
             checkBoxGooglePlay, checkBoxRemoveAds, checkBoxRemoveAnalytics, checkBoxRemoveGPServices,
-            checkBoxRemoveVpn, checkBoxRemoveInstallerCheck, checkBoxRemoveUpdate, checkBoxRemoveLocales,
+            checkBoxRemoveVpn, checkBoxAllowScreenshots, checkBoxRemoveInstallerCheck, checkBoxRemoveUpdate, checkBoxRemoveLocales,
             checkBoxRemoveDpi, checkBoxRemoveLibs, checkBoxOptimize
         )) {
             refreshToggleText(b)
@@ -372,7 +376,7 @@ class PatchActivity : AppCompatActivity() {
     private fun updatePatchButtonState() {
         val any = checkBoxGooglePlay.isChecked || checkBoxRemoveAds.isChecked ||
                 checkBoxRemoveAnalytics.isChecked || checkBoxRemoveGPServices.isChecked ||
-                checkBoxRemoveVpn.isChecked || checkBoxRemoveInstallerCheck.isChecked || checkBoxRemoveUpdate.isChecked || checkBoxRemoveLocales.isChecked ||
+                checkBoxAllowScreenshots.isChecked || checkBoxRemoveVpn.isChecked || checkBoxRemoveInstallerCheck.isChecked || checkBoxRemoveUpdate.isChecked || checkBoxRemoveLocales.isChecked ||
                 checkBoxRemoveDpi.isChecked || checkBoxRemoveLibs.isChecked || checkBoxOptimize.isChecked
         btnPatch.isEnabled = any
         btnPatch.visibility = if (any) View.VISIBLE else View.GONE
@@ -626,7 +630,7 @@ class PatchActivity : AppCompatActivity() {
     private fun otherPatchesSelected(): Boolean {
         return checkBoxGooglePlay.isChecked || checkBoxRemoveAds.isChecked ||
                 checkBoxRemoveAnalytics.isChecked || checkBoxRemoveGPServices.isChecked ||
-                checkBoxRemoveVpn.isChecked || checkBoxRemoveInstallerCheck.isChecked ||
+                checkBoxRemoveVpn.isChecked || checkBoxAllowScreenshots.isChecked || checkBoxRemoveInstallerCheck.isChecked ||
                 checkBoxRemoveUpdate.isChecked ||
                 checkBoxRemoveLocales.isChecked || checkBoxRemoveDpi.isChecked ||
                 checkBoxRemoveLibs.isChecked || checkBoxOptimize.isChecked
@@ -668,8 +672,11 @@ class PatchActivity : AppCompatActivity() {
             putExtra(PatchService.EXTRA_PATCH_REMOVE_ANALYTICS, checkBoxRemoveAnalytics.isChecked)
             putExtra(PatchService.EXTRA_PATCH_REMOVE_GP_SERVICES, checkBoxRemoveGPServices.isChecked)
             putExtra(PatchService.EXTRA_PATCH_REMOVE_VPN, checkBoxRemoveVpn.isChecked)
+            putExtra(PatchService.EXTRA_PATCH_ALLOW_SCREENSHOTS, checkBoxAllowScreenshots.isChecked)
             putExtra(PatchService.EXTRA_PATCH_REMOVE_INSTALLER_CHECK, checkBoxRemoveInstallerCheck.isChecked)
             putExtra(PatchService.EXTRA_PATCH_REMOVE_UPDATE, checkBoxRemoveUpdate.isChecked)
+
+        putExtra(PatchService.EXTRA_PATCH_REMOVE_SIGNATURE, false)
             putExtra(PatchService.EXTRA_PATCH_REMOVE_LOCALES, checkBoxRemoveLocales.isChecked)
             putStringArrayListExtra(PatchService.EXTRA_PATCH_REMOVE_LOCALES_LIST, ArrayList(selectedLocales))
             putExtra(PatchService.EXTRA_PATCH_REMOVE_DPI, checkBoxRemoveDpi.isChecked)

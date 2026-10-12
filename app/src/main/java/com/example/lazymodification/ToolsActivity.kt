@@ -1,5 +1,6 @@
 package com.example.lazymodification
 
+import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -13,13 +14,17 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.example.lazymodification.utils.FileSaver
 import com.example.lazymodification.utils.SaveFolderHelper
+import com.example.lazymodification.utils.SignatureConfig
 import com.example.lazymodification.utils.SignatureCreator
+import com.example.lazymodification.utils.SigningUtils
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.color.MaterialColors
 import java.io.ByteArrayInputStream
+import java.io.File
 
 /**
  * Форма «Инструменты».
@@ -30,6 +35,116 @@ class ToolsActivity : AppCompatActivity() {
 
     private val uiHandler = Handler(Looper.getMainLooper())
 
+    private var killApkPath: String? = null
+    private var killV1 = true
+    private var killV2 = true
+    private var killV3 = true
+    private var pendingKillConfirm: ((SignatureConfig) -> Unit)? = null
+
+    private val keystoreLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            val file = SigningUtils.copyKeystoreToCache(this, uri)
+            if (file != null) {
+                SigningUtils.showKeystorePasswordDialog(this, file, killV1, killV2, killV3) { config ->
+                    pendingKillConfirm?.invoke(config)
+                    pendingKillConfirm = null
+                }
+            } else {
+                Toast.makeText(this, getString(R.string.err_keystore_read_failed), Toast.LENGTH_LONG).show()
+                pendingKillConfirm = null
+            }
+        } else {
+            Toast.makeText(this, getString(R.string.err_keystore_not_selected), Toast.LENGTH_SHORT).show()
+            pendingKillConfirm = null
+        }
+    }
+
+    private val pickApkForKillLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val path = result.data?.getStringExtra(FileBrowserActivity.EXTRA_SELECTED_PATH)
+            if (path != null) {
+                val file = File(path)
+                if (file.exists()) {
+                    startKillFlow(path)
+                } else {
+                    Toast.makeText(this, getString(R.string.file_not_found), Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private val pickApkForDexEditorLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val path = result.data?.getStringExtra(FileBrowserActivity.EXTRA_SELECTED_PATH)
+            if (path != null) {
+                val file = File(path)
+                if (file.exists()) {
+                    startActivity(Intent(this, DexEditorActivity::class.java).apply {
+                        putExtra(DexEditorActivity.EXTRA_APK_PATH, path)
+                    })
+                } else {
+                    Toast.makeText(this, getString(R.string.file_not_found), Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun startKillFlow(path: String) {
+        killApkPath = path
+        pendingKillConfirm = { config -> startKillPatching(config) }
+        SigningUtils.resolveSigningConfig(
+            activity = this,
+            onCustomSelected = { v1, v2, v3 ->
+                killV1 = v1; killV2 = v2; killV3 = v3
+                keystoreLauncher.launch(arrayOf("*/*"))
+            },
+            onConfirm = { config -> startKillPatching(config) }
+        )
+    }
+
+    private fun startKillPatching(config: SignatureConfig) {
+        val path = killApkPath ?: return
+        val serviceIntent = Intent(this, PatchService::class.java).apply {
+            putExtra(PatchService.EXTRA_APK_PATH, path)
+            putExtra(PatchService.EXTRA_PATCH_GOOGLE_PLAY, false)
+            putExtra(PatchService.EXTRA_PATCH_REMOVE_ADS, false)
+            putExtra(PatchService.EXTRA_PATCH_REMOVE_ANALYTICS, false)
+            putExtra(PatchService.EXTRA_PATCH_REMOVE_GP_SERVICES, false)
+            putExtra(PatchService.EXTRA_PATCH_REMOVE_VPN, false)
+            putExtra(PatchService.EXTRA_PATCH_REMOVE_INSTALLER_CHECK, false)
+            putExtra(PatchService.EXTRA_PATCH_REMOVE_UPDATE, false)
+            putExtra(PatchService.EXTRA_PATCH_REMOVE_SIGNATURE, true)
+            putExtra(PatchService.EXTRA_TOOLS_KILL_ONLY, true)
+            putExtra(PatchService.EXTRA_PATCH_REMOVE_LOCALES, false)
+            putExtra(PatchService.EXTRA_PATCH_REMOVE_DPI, false)
+            putExtra(PatchService.EXTRA_PATCH_REMOVE_LIBS, false)
+            putExtra(PatchService.EXTRA_PATCH_OPTIMIZE, false)
+            putExtra(PatchService.EXTRA_NO_SIGN, config.noSign)
+            putExtra(PatchService.EXTRA_SIGN_V1, config.signV1)
+            putExtra(PatchService.EXTRA_SIGN_V2, config.signV2)
+            putExtra(PatchService.EXTRA_SIGN_V3, config.signV3)
+            putExtra(PatchService.EXTRA_CUSTOM_KEYSTORE_PATH, config.customKeystorePath)
+            putExtra(PatchService.EXTRA_KEYSTORE_PASSWORD, config.keystorePassword)
+            putExtra(PatchService.EXTRA_KEY_ALIAS, config.keyAlias)
+            putExtra(PatchService.EXTRA_KEY_PASSWORD, config.keyPassword)
+            putExtra(PatchService.EXTRA_KEYSTORE_TYPE, config.keystoreType)
+        }
+        try {
+            startForegroundService(serviceIntent)
+            startActivity(Intent(this, LogActivity::class.java).apply {
+                putExtra("SOURCE_APK_PATH", path)
+            })
+        } catch (e: Exception) {
+            Toast.makeText(this, getString(R.string.error_msg_plain, e.message), Toast.LENGTH_LONG).show()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ThemeHelper.apply(this)
@@ -37,6 +152,18 @@ class ToolsActivity : AppCompatActivity() {
 
         findViewById<MaterialButton>(R.id.btnCreateSignature).setOnClickListener {
             showCreateSignatureDialog()
+        }
+
+        findViewById<MaterialButton>(R.id.btnRemoveSignatureCheck).setOnClickListener {
+            pickApkForKillLauncher.launch(Intent(this, FileBrowserActivity::class.java).apply {
+                putExtra(FileBrowserActivity.EXTRA_FILE_MODE, FileBrowserActivity.MODE_APK)
+            })
+        }
+
+        findViewById<MaterialButton>(R.id.btnDexEditor).setOnClickListener {
+            pickApkForDexEditorLauncher.launch(Intent(this, FileBrowserActivity::class.java).apply {
+                putExtra(FileBrowserActivity.EXTRA_FILE_MODE, FileBrowserActivity.MODE_APK)
+            })
         }
     }
 

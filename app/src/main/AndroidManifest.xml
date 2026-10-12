@@ -54,6 +54,8 @@
         <activity android:name=".InterfaceModifierActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
     <activity android:name=".InterfaceToolsActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
     <activity android:name=".ToolsActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
+    <activity android:name=".DexEditorActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
+    <activity android:name=".MethodCodeActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
     <activity android:name=".TranslateAppActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
     <activity android:name=".CompareApkActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />    <activity android:name=".CompareFileActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
 

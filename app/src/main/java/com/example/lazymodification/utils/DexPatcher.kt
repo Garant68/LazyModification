@@ -54,10 +54,20 @@ data class PatchResult(
     val debugItemsRemoved: Int = 0,
     val manifestPatched: Int = 0,
     val signaturePatched: Int = 0,  // ✅ НОВОЕ
-    val updateCheckPatched: Int = 0  // Play In-App Updates
+    val updateCheckPatched: Int = 0,  // Play In-App Updates
+    val screenshotsPatched: Int = 0  // Allow screenshots (FLAG_SECURE)
 ) {
     val analyticsPatched: Int get() = analyticsUrlPatched + analyticsFieldPatched
 }
+
+/** Правка «заглушить метод» для мини-редактора dex. */
+data class StubEdit(
+    val className: String,
+    val methodName: String,
+    val paramTypes: List<String>,
+    val returnType: String,
+    val stub: String
+)
 
 object DexPatcher {
 
@@ -163,9 +173,25 @@ object DexPatcher {
         RegexOption.IGNORE_CASE
     )
 
+    // ✅ XML namespace-URI кастомных View-атрибутов (schemas.*) — НЕ трогаем:
+    // SDK читают по ним атрибуты из layout'ов. Замена ломает SDK (например,
+    // AppLovin MaxAdView падает с "No ad unit ID specified" — namespace заменён).
+    private fun isNamespaceUri(s: String): Boolean {
+        var t = s.trim()
+        if (t.length >= 7 && t.substring(0, 7).equals("http://", ignoreCase = true)) {
+            t = t.substring(7)
+        } else if (t.length >= 8 && t.substring(0, 8).equals("https://", ignoreCase = true)) {
+            t = t.substring(8)
+        } else if (t.startsWith("//")) {
+            t = t.substring(2)
+        }
+        return t.startsWith("schemas.", ignoreCase = true)
+    }
+
     private fun isUrlLike(s: String): Boolean {
         val trimmed = s.trim()
         if (trimmed.isEmpty()) return false
+        if (isNamespaceUri(trimmed)) return false
         if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true) ||
             trimmed.startsWith("ws://", ignoreCase = true) || trimmed.startsWith("wss://", ignoreCase = true) ||
             trimmed.startsWith("//")) return true
@@ -247,8 +273,19 @@ object DexPatcher {
         patchRemoveAnalytics: Boolean = false, patchRemoveGPServices: Boolean = false,
         patchRemoveVpn: Boolean = false, patchRemoveInstallerCheck: Boolean = false, patchRemoveDebug: Boolean = false,
         patchRemoveSignature: Boolean = false,  // ✅ НОВОЕ
-        patchRemoveUpdate: Boolean = false  // Play In-App Updates
+        patchRemoveUpdate: Boolean = false,  // Play In-App Updates
+        patchAllowScreenshots: Boolean = false  // Allow screenshots (remove FLAG_SECURE)
     ): PatchResult {
+        // ⚡ Ни один патч не запрошен — копируем байт-в-байт без разбора dex
+        if (!patchGooglePlay && !patchRemoveAds && !patchRemoveAnalytics && !patchRemoveGPServices &&
+            !patchRemoveVpn && !patchRemoveInstallerCheck && !patchRemoveDebug &&
+            !patchRemoveSignature && !patchRemoveUpdate && !patchAllowScreenshots
+        ) {
+            inputDex.copyTo(outputDex, overwrite = true)
+            android.util.Log.d(TAG, "⏩ ${inputDex.name}: патчи не запрошены — копия без разбора")
+            return PatchResult()
+        }
+
         val opcodes = Opcodes.forApi(28)
         val dex = DexFileFactory.loadDexFile(inputDex, opcodes)
 
@@ -256,7 +293,7 @@ object DexPatcher {
         var caAppPubCount = 0; var analyticsUrlCount = 0; var analyticsFieldCount = 0
         var gpServicesCount = 0; var vpnCount = 0; var installerCheckCount = 0; var debugItemsCount = 0
         var signatureCount = 0  // ✅ НОВОЕ
-        var updateCount = 0
+        var updateCount = 0; var screenshotCount = 0
 
         val startTime = System.currentTimeMillis()
         android.util.Log.d(TAG, "🔍 DEX: ${inputDex.name}, GP=$patchGooglePlay, Ads=$patchRemoveAds, Analytics=$patchRemoveAnalytics, GP_Svc=$patchRemoveGPServices, VPN=$patchRemoveVpn, Debug=$patchRemoveDebug, Sign=$patchRemoveSignature")
@@ -268,62 +305,506 @@ object DexPatcher {
                 } else classDef.staticFields
 
                 val directMethods = classDef.directMethods.map { method ->
-                    patchMethod(method, patchGooglePlay, patchRemoveAds, patchRemoveAnalytics, patchRemoveGPServices, patchRemoveVpn, patchRemoveInstallerCheck, patchRemoveDebug, patchRemoveSignature, patchRemoveUpdate,
+                    val m1 = patchMethod(method, patchGooglePlay, patchRemoveAds, patchRemoveAnalytics, patchRemoveGPServices, patchRemoveVpn, patchRemoveInstallerCheck, patchRemoveDebug, patchRemoveSignature, patchRemoveUpdate,
                         { googlePlayCount++ }, { adsCount++ }, { adsBooleanCount++ }, { urlsCount++ }, { caAppPubCount++ },
                         { analyticsUrlCount++ }, { gpServicesCount++ }, { vpnCount++ }, { installerCheckCount++ }, { debugItemsCount++ }, { signatureCount++ }, { updateCount++ })
+                    if (patchAllowScreenshots) patchScreenshots(m1) { screenshotCount++ } else m1
                 }
 
                 val virtualMethods = classDef.virtualMethods.map { method ->
-                    patchMethod(method, patchGooglePlay, patchRemoveAds, patchRemoveAnalytics, patchRemoveGPServices, patchRemoveVpn, patchRemoveInstallerCheck, patchRemoveDebug, patchRemoveSignature, patchRemoveUpdate,
+                    val m1 = patchMethod(method, patchGooglePlay, patchRemoveAds, patchRemoveAnalytics, patchRemoveGPServices, patchRemoveVpn, patchRemoveInstallerCheck, patchRemoveDebug, patchRemoveSignature, patchRemoveUpdate,
                         { googlePlayCount++ }, { adsCount++ }, { adsBooleanCount++ }, { urlsCount++ }, { caAppPubCount++ },
                         { analyticsUrlCount++ }, { gpServicesCount++ }, { vpnCount++ }, { installerCheckCount++ }, { debugItemsCount++ }, { signatureCount++ }, { updateCount++ })
+                    if (patchAllowScreenshots) patchScreenshots(m1) { screenshotCount++ } else m1
                 }
 
                 ImmutableClassDef(classDef.type, classDef.accessFlags, classDef.superclass, classDef.interfaces, classDef.sourceFile, classDef.annotations,
                     patchedStaticFields, classDef.instanceFields, directMethods, virtualMethods)
             }
 
-            writeDexWithRepair(outputDex, opcodes, patchedClasses)
-            android.util.Log.d(TAG, "📊 GP=$googlePlayCount, Ads(V)=$adsCount, Ads(Z)=$adsBooleanCount, URL=$urlsCount, ca-app-pub=$caAppPubCount, Analytics(URL)=$analyticsUrlCount, Analytics(Field)=$analyticsFieldCount, GP_Svc=$gpServicesCount, VPN=$vpnCount, Sign=$signatureCount, Debug=$debugItemsCount, Time=${System.currentTimeMillis() - startTime}ms")
+            val totalChanges = googlePlayCount + adsCount + adsBooleanCount + urlsCount + caAppPubCount +
+                analyticsUrlCount + analyticsFieldCount + gpServicesCount + vpnCount + installerCheckCount +
+                debugItemsCount + signatureCount + updateCount + screenshotCount
+            if (totalChanges == 0) {
+                // ✅ Изменений нет — копируем DEX байт-в-байт (без рискованной пересборки dexlib2)
+                inputDex.copyTo(outputDex, overwrite = true)
+                android.util.Log.d(TAG, "⏩ ${inputDex.name}: изменений нет — копия без пересборки")
+            } else {
+                writeDexWithRepair(outputDex, opcodes, patchedClasses)
+            }
+            android.util.Log.d(TAG, "📊 GP=$googlePlayCount, Ads(V)=$adsCount, Ads(Z)=$adsBooleanCount, URL=$urlsCount, ca-app-pub=$caAppPubCount, Analytics(URL)=$analyticsUrlCount, Analytics(Field)=$analyticsFieldCount, GP_Svc=$gpServicesCount, VPN=$vpnCount, Shots=$screenshotCount, Sign=$signatureCount, Debug=$debugItemsCount, Time=${System.currentTimeMillis() - startTime}ms")
         } catch (e: Exception) { android.util.Log.e(TAG, "❌ Ошибка: ${e.message}", e); throw e }
 
         return PatchResult(googlePlayCount, adsCount + adsBooleanCount, adsBooleanCount, urlsCount, caAppPubCount,
-            analyticsUrlCount, analyticsFieldCount, gpServicesCount, vpnCount, installerCheckCount, debugItemsCount, 0, signatureCount, updateCount)
+            analyticsUrlCount, analyticsFieldCount, gpServicesCount, vpnCount, installerCheckCount, debugItemsCount, 0, signatureCount, updateCount, screenshotCount)
     }
 
     // ============================================================
-    // ✅ АВТО-ПОЧИНКА: методы, которые dexlib2 не может записать
-    // («Exception occurred while writing code_item for method ...» —
-    // например, кривая структура try/catch после R8/bundletool).
-    // Повторяем запись, отбросив таблицу try/catch у проблемного метода.
+    // ✅ РАЗРЕШИТЬ СКРИНШОТЫ: гасим FLAG_SECURE (0x2000)
+    // Связка «const 0x2000 → invoke Window.addFlags/setFlags» —
+    // чистим бит FLAG_SECURE прямо в константе (1-в-1 по размеру).
     // ============================================================
-    private fun writeDexWithRepair(outputDex: File, opcodes: Opcodes, classes: List<org.jf.dexlib2.iface.ClassDef>) {
-        try {
-            DexFileFactory.writeDexFile(outputDex.absolutePath, ImmutableDexFile(opcodes, classes))
-        } catch (e: Exception) {
-            val msg = e.message ?: ""
-            if (!msg.contains("code_item for method")) throw e
-            val methodDesc = msg.substringAfter("code_item for method ").substringBefore(" ")
-            // Починка 1: отбросить try/catch у проблемного метода
-            val repaired = repairClassList(classes, methodDesc)
-            if (repaired == null) throw e
-            android.util.Log.w(TAG, "♻️ Починка метода $methodDesc: таблица try/catch отброшена")
-            try {
-                DexFileFactory.writeDexFile(outputDex.absolutePath, ImmutableDexFile(opcodes, repaired))
-            } catch (e2: Exception) {
-                val protoStr = findItemNotFound(e2)
-                if (protoStr == null) throw e2
-                // Починка 2: недостающий прото (например, прото invoke-polymorphic,
-                // на который ссылается только эта инструкция) — добавляем
-                // синтетический native-метод с таким прото в первый класс.
-                val fixed = addProtoStub(repaired, protoStr)
-                if (fixed == null) throw e2
-                android.util.Log.w(TAG, "♻️ Добавлен заглушечный прото: $protoStr")
-                DexFileFactory.writeDexFile(outputDex.absolutePath, ImmutableDexFile(opcodes, fixed))
+    private const val FLAG_SECURE = 0x2000
+
+    internal fun patchScreenshots(method: org.jf.dexlib2.iface.Method, onPatch: () -> Unit): org.jf.dexlib2.iface.Method {
+        val impl = method.implementation ?: return method
+        val insns = impl.instructions.toList()
+        if (insns.isEmpty()) return method
+        val replacements = HashMap<Int, Instruction>()
+        for (i in insns.indices) {
+            val ins = insns[i]
+            if (ins !is ReferenceInstruction) continue
+            if (!isWindowFlagInvoke(ins)) continue
+            val argReg = invokeFlagsRegister(ins) ?: continue
+            val ci = findFlagConst(insns, i, argReg) ?: continue
+            val cins = insns[ci]
+            val value = flagConstValue(cins) ?: continue
+            if (value and FLAG_SECURE == 0) continue
+            replacements[ci] = buildFlagConst(cins, value and FLAG_SECURE.inv())
+        }
+        if (replacements.isEmpty()) return method
+        onPatch()
+        val newInsns = ArrayList<Instruction>(insns.size)
+        for (i in insns.indices) newInsns.add(replacements[i] ?: insns[i])
+        val newImpl = ImmutableMethodImplementation(impl.registerCount, newInsns, impl.tryBlocks, impl.debugItems)
+        return ImmutableMethod(
+            method.definingClass, method.name, method.parameters, method.returnType,
+            method.accessFlags, method.annotations, method.hiddenApiRestrictions, newImpl
+        )
+    }
+
+    private fun isWindowFlagInvoke(ins: ReferenceInstruction): Boolean {
+        val ref = ins.reference as? MethodReference ?: return false
+        if (ref.definingClass != "Landroid/view/Window;") return false
+        if (ref.returnType != "V") return false
+        val params = ref.parameterTypes
+        return when (ref.name) {
+            "addFlags" -> params.size == 1 && params.first().toString() == "I"
+            "setFlags" -> params.size == 2 && params.all { it.toString() == "I" }
+            else -> false
+        }
+    }
+
+    private fun invokeFlagsRegister(ins: Instruction): Int? = when (ins) {
+        is org.jf.dexlib2.iface.instruction.formats.Instruction35c ->
+            if (ins.registerCount >= 2) ins.registerD else null
+        is org.jf.dexlib2.iface.instruction.formats.Instruction3rc ->
+            if (ins.registerCount >= 2) ins.startRegister + 1 else null
+        else -> null
+    }
+
+    private fun findFlagConst(insns: List<Instruction>, invokeIdx: Int, reg: Int): Int? {
+        var steps = 0
+        var i = invokeIdx - 1
+        while (i >= 0 && steps < 8) {
+            val ins = insns[i]
+            if (isFlagConstInsn(ins) && (ins as org.jf.dexlib2.iface.instruction.OneRegisterInstruction).registerA == reg) {
+                return i
+            }
+            if (mentionsRegister(ins, reg)) return null
+            i--
+            steps++
+        }
+        return null
+    }
+
+    private fun isFlagConstInsn(ins: Instruction): Boolean = when (ins.opcode.name) {
+        "const/4", "const/16", "const" -> true
+        else -> false
+    }
+
+    private fun flagConstValue(ins: Instruction): Int? = when (ins.opcode.name) {
+        "const/4", "const/16" -> (ins as? org.jf.dexlib2.iface.instruction.NarrowLiteralInstruction)?.narrowLiteral
+        "const" -> (ins as? org.jf.dexlib2.iface.instruction.WideLiteralInstruction)?.wideLiteral?.toInt()
+        else -> null
+    }
+
+    private fun buildFlagConst(orig: Instruction, value: Int): Instruction {
+        val regA = (orig as org.jf.dexlib2.iface.instruction.OneRegisterInstruction).registerA
+        return when (orig.opcode.name) {
+            "const/16" -> ImmutableInstruction21s(orig.opcode, regA, value)
+            "const" -> ImmutableInstruction31i(orig.opcode, regA, value)
+            "const/4" -> ImmutableInstruction11n(orig.opcode, regA, value)
+            else -> orig
+        }
+    }
+
+    private fun mentionsRegister(ins: Instruction, reg: Int): Boolean = when (ins) {
+        is org.jf.dexlib2.iface.instruction.FiveRegisterInstruction -> {
+            val regs = intArrayOf(ins.registerC, ins.registerD, ins.registerE, ins.registerF, ins.registerG)
+            var found = false
+            for (k in 0 until ins.registerCount) {
+                if (regs[k] == reg) found = true
+            }
+            found
+        }
+        is org.jf.dexlib2.iface.instruction.RegisterRangeInstruction ->
+            reg >= ins.startRegister && reg < ins.startRegister + ins.registerCount
+        is org.jf.dexlib2.iface.instruction.ThreeRegisterInstruction ->
+            ins.registerA == reg || ins.registerB == reg || ins.registerC == reg
+        is org.jf.dexlib2.iface.instruction.TwoRegisterInstruction ->
+            ins.registerA == reg || ins.registerB == reg
+        is org.jf.dexlib2.iface.instruction.OneRegisterInstruction -> ins.registerA == reg
+        else -> false
+    }
+
+    // ============================================================
+    // ✅ ЗАГЛУШИТЬ МЕТОД (мини-редактор dex)
+    // Замена тела выбранного метода на return 0/false/true/void/null.
+    // ============================================================
+    fun stubMethods(inputDex: File, outputDex: File, edits: List<StubEdit>): Int {
+        if (edits.isEmpty()) {
+            inputDex.copyTo(outputDex, overwrite = true)
+            return 0
+        }
+        val opcodes = Opcodes.forApi(28)
+        val dex = DexFileFactory.loadDexFile(inputDex, opcodes)
+        val editsByClass = HashMap<String, MutableList<StubEdit>>()
+        for (e in edits) editsByClass.getOrPut(e.className) { mutableListOf() }.add(e)
+        var applied = 0
+        val newClasses = dex.classes.map { c ->
+            val classEdits = editsByClass[c.type]
+            if (classEdits == null || classEdits.isEmpty()) {
+                c
+            } else {
+                var changed = false
+                fun patchList(list: Iterable<org.jf.dexlib2.iface.Method>): List<org.jf.dexlib2.iface.Method> {
+                    return list.map { m ->
+                        val e = classEdits.firstOrNull { ed ->
+                            ed.methodName == m.name && ed.returnType == m.returnType &&
+                                m.parameterTypes.map { it.toString() } == ed.paramTypes &&
+                                m.implementation != null
+                        }
+                        if (e == null) {
+                            m
+                        } else {
+                            val st = buildStubMethod(m, e.stub)
+                            if (st == null) {
+                                m
+                            } else {
+                                changed = true
+                                applied++
+                                st
+                            }
+                        }
+                    }
+                }
+                val nd = patchList(c.directMethods)
+                val nv = patchList(c.virtualMethods)
+                if (!changed) {
+                    c
+                } else {
+                    ImmutableClassDef(c.type, c.accessFlags, c.superclass, c.interfaces, c.sourceFile, c.annotations,
+                        c.staticFields, c.instanceFields, nd, nv)
+                }
+            }
+        }
+        if (applied == 0) {
+            inputDex.copyTo(outputDex, overwrite = true)
+            return 0
+        }
+        writeDexWithRepair(outputDex, opcodes, newClasses)
+        return applied
+    }
+
+    // ============================================================
+    // ✏️ ИЗМЕНЕНИЕ КОДА (правка инструкций, как в MT)
+    // Замена конкретных инструкций по адресу в конкретном методе.
+    // Формат (размер) инструкции сохраняется — смещения не сбиваются.
+    // ============================================================
+    fun applyCodeEdits(inputDex: File, outputDex: File, edits: List<CodeEdit>): Int {
+        if (edits.isEmpty()) {
+            inputDex.copyTo(outputDex, overwrite = true)
+            return 0
+        }
+        val opcodes = Opcodes.forApi(28)
+        val dex = DexFileFactory.loadDexFile(inputDex, opcodes)
+        val byClass = HashMap<String, MutableList<CodeEdit>>()
+        for (e in edits) byClass.getOrPut(e.className) { mutableListOf() }.add(e)
+        var applied = 0
+        val newClasses = dex.classes.map { c ->
+            val ces = byClass[c.type]
+            if (ces.isNullOrEmpty()) {
+                c
+            } else {
+                val before = applied
+                fun patchList(list: Iterable<org.jf.dexlib2.iface.Method>): List<org.jf.dexlib2.iface.Method> {
+                    return list.map { m ->
+                        val impl = m.implementation ?: return@map m
+                        val params = m.parameterTypes.map { it.toString() }
+                        val mine = ces.filter { e -> e.methodName == m.name && e.paramTypes == params && e.returnType == m.returnType }
+                        if (mine.isEmpty()) return@map m
+                        val byAddr = HashMap<Int, String>()
+                        for (e in mine) byAddr[e.addr] = e.newText
+                        val valid = HashSet<Int>()
+                        var a0 = 0
+                        for (i0 in impl.instructions) {
+                            valid.add(a0)
+                            a0 += i0.codeUnits
+                        }
+                        val pb = impl.registerCount - paramRegisterCount(m)
+                        var changed = false
+                        val newInsns = ArrayList<Instruction>()
+                        var addr = 0
+                        for (ins in impl.instructions) {
+                            val nt = byAddr[addr]
+                            var rep: Instruction? = null
+                            if (nt != null) {
+                                try {
+                                    rep = DexCodeEditor.parseInstruction(nt, ins, addr, valid, pb)
+                                } catch (_: Throwable) {
+                                    rep = null
+                                }
+                            }
+                            if (rep != null) {
+                                newInsns.add(rep)
+                                changed = true
+                                applied++
+                            } else {
+                                newInsns.add(ins)
+                            }
+                            addr += ins.codeUnits
+                        }
+                        if (!changed) {
+                            m
+                        } else {
+                            ImmutableMethod(m.definingClass, m.name, m.parameters, m.returnType, m.accessFlags,
+                                m.annotations, m.hiddenApiRestrictions,
+                                ImmutableMethodImplementation(impl.registerCount, newInsns, impl.tryBlocks, impl.debugItems))
+                        }
+                    }
+                }
+                val nd = patchList(c.directMethods)
+                val nv = patchList(c.virtualMethods)
+                if (applied == before) {
+                    c
+                } else {
+                    ImmutableClassDef(c.type, c.accessFlags, c.superclass, c.interfaces, c.sourceFile, c.annotations,
+                        c.staticFields, c.instanceFields, nd, nv)
+                }
+            }
+        }
+        if (applied == 0) {
+            inputDex.copyTo(outputDex, overwrite = true)
+            return 0
+        }
+        writeDexWithRepair(outputDex, opcodes, newClasses)
+        return try {
+            verifyCodeEdits(outputDex, edits, applied)
+        } catch (_: Throwable) {
+            -1
+        }
+    }
+
+    private fun verifyCodeEdits(outputDex: File, edits: List<CodeEdit>, applied: Int): Int {
+        val opcodes = Opcodes.forApi(28)
+        val dex = DexFileFactory.loadDexFile(outputDex, opcodes)
+        val classMap = HashMap<String, org.jf.dexlib2.iface.ClassDef>()
+        for (c in dex.classes) classMap[c.type] = c
+        for (e in edits) {
+            val c = classMap[e.className] ?: continue
+            var mFound: org.jf.dexlib2.iface.Method? = null
+            for (m in c.methods) {
+                val params = m.parameterTypes.map { it.toString() }
+                if (m.name == e.methodName && params == e.paramTypes && m.returnType == e.returnType) {
+                    mFound = m
+                    break
+                }
+            }
+            val m = mFound ?: continue
+            val impl = m.implementation ?: continue
+            val pb = impl.registerCount - paramRegisterCount(m)
+            var addr = 0
+            var checked = false
+            for (ins in impl.instructions) {
+                if (addr == e.addr) {
+                    val t = SmaliPrinter.format(ins, addr, pb)
+                    if (t != e.newText) return -1
+                    checked = true
+                    break
+                }
+                addr += ins.codeUnits
+            }
+            if (!checked) return -1
+        }
+        return applied
+    }
+
+    private fun paramRegisterCount(m: org.jf.dexlib2.iface.Method): Int {
+        var n = if ((m.accessFlags and 0x8) != 0) 0 else 1
+        for (pt in m.parameterTypes) {
+            val s = pt.toString()
+            n += if (s == "J" || s == "D") 2 else 1
+        }
+        return n
+    }
+
+    private fun buildStubMethod(m: org.jf.dexlib2.iface.Method, stub: String): org.jf.dexlib2.iface.Method? {
+        if (m.name == "<init>" || m.name == "<clinit>") return null
+        if (m.implementation == null) return null
+        val insSize = paramRegisterCount(m)
+        val ret = m.returnType
+        val insns: List<Instruction>
+        val regs: Int
+        when {
+            ret == "V" -> {
+                if (stub != "void") return null
+                insns = listOf(ImmutableInstruction10x(Opcode.RETURN_VOID))
+                regs = insSize
+            }
+            ret == "Z" || ret == "I" || ret == "S" || ret == "B" || ret == "C" || ret == "F" -> {
+                val v = when (stub) {
+                    "false" -> 0
+                    "true" -> 1
+                    "0" -> 0
+                    "1" -> 1
+                    else -> return null
+                }
+                insns = listOf(
+                    ImmutableInstruction11n(Opcode.CONST_4, 0, v),
+                    ImmutableInstruction11x(Opcode.RETURN, 0)
+                )
+                regs = insSize + 1
+            }
+            ret == "J" || ret == "D" -> {
+                val v = when (stub) {
+                    "0" -> 0
+                    "1" -> 1
+                    else -> return null
+                }
+                insns = listOf(
+                    ImmutableInstruction21s(Opcode.CONST_WIDE_16, 0, v),
+                    ImmutableInstruction11x(Opcode.RETURN_WIDE, 0)
+                )
+                regs = insSize + 1
+            }
+            ret.startsWith("L") || ret.startsWith("[") -> {
+                if (stub != "null") return null
+                insns = listOf(
+                    ImmutableInstruction11n(Opcode.CONST_4, 0, 0),
+                    ImmutableInstruction11x(Opcode.RETURN_OBJECT, 0)
+                )
+                regs = insSize + 1
+            }
+            else -> return null
+        }
+        val impl = ImmutableMethodImplementation(regs, insns, emptyList(), emptyList())
+        return ImmutableMethod(m.definingClass, m.name, m.parameters, m.returnType, m.accessFlags,
+            m.annotations, m.hiddenApiRestrictions, impl)
+    }
+
+    // ============================================================
+    // ✅ АВТО-ПОЧИНКА ЗАПИСИ DEX
+    // Известный баг dexlib2 2.5.2: proto-ссылки инструкций invoke-polymorphic
+    // не попадают в пул прототипов → «Item not found.» при записи
+    // («Exception occurred while writing code_item for method ...»).
+    // Починка: пишем через DexPool, предварительно интернируя такие proto
+    // в его собственный пул. Резерв: заглушка-метод с недостающим proto /
+    // отбрасывание try/catch у проблемного метода.
+    // ============================================================
+    private fun collectPolyProtos(classes: List<org.jf.dexlib2.iface.ClassDef>): List<org.jf.dexlib2.iface.reference.MethodProtoReference> {
+        val out = ArrayList<org.jf.dexlib2.iface.reference.MethodProtoReference>()
+        val seen = HashSet<String>()
+        for (c in classes) {
+            for (m in c.directMethods) collectPolyProtosFrom(m, seen, out)
+            for (m in c.virtualMethods) collectPolyProtosFrom(m, seen, out)
+        }
+        return out
+    }
+
+    private fun collectPolyProtosFrom(
+        m: org.jf.dexlib2.iface.Method,
+        seen: HashSet<String>,
+        out: MutableList<org.jf.dexlib2.iface.reference.MethodProtoReference>
+    ) {
+        val impl = m.implementation ?: return
+        for (ins in impl.instructions) {
+            if (ins is org.jf.dexlib2.iface.instruction.DualReferenceInstruction) {
+                val r2 = ins.reference2
+                if (r2 is org.jf.dexlib2.iface.reference.MethodProtoReference) {
+                    val key = r2.parameterTypes.joinToString("") + "|" + r2.returnType
+                    if (seen.add(key)) out.add(r2)
+                }
             }
         }
     }
 
+    private fun writeViaPoolFix(
+        outputDex: File,
+        opcodes: Opcodes,
+        classes: List<org.jf.dexlib2.iface.ClassDef>,
+        protos: List<org.jf.dexlib2.iface.reference.MethodProtoReference>
+    ) {
+        val pool = org.jf.dexlib2.writer.pool.DexPool(opcodes)
+        for (c in classes) pool.internClass(c)
+        val sec = pool.protoSection as? org.jf.dexlib2.writer.pool.ProtoPool
+        if (sec != null) {
+            for (p in protos) {
+                try { sec.intern(p) } catch (_: Throwable) { }
+            }
+        }
+        if (outputDex.exists()) outputDex.delete()
+        val store = org.jf.dexlib2.writer.io.FileDataStore(outputDex)
+        try {
+            pool.writeTo(store)
+        } finally {
+            try { store.close() } catch (_: Throwable) { }
+        }
+    }
+
+    private fun writeDexWithRepair(outputDex: File, opcodes: Opcodes, classes: List<org.jf.dexlib2.iface.ClassDef>) {
+        // Шаг 1: обычная запись
+        try {
+            DexFileFactory.writeDexFile(outputDex.absolutePath, ImmutableDexFile(opcodes, classes))
+            return
+        } catch (first: Exception) {
+            android.util.Log.w(TAG, "♻️ Запись dex не удалась: ${first.message}")
+        }
+        // Шаг 2: запись через DexPool с интернированием proto invoke-polymorphic
+        val polyProtos = collectPolyProtos(classes)
+        if (polyProtos.isNotEmpty()) {
+            try {
+                writeViaPoolFix(outputDex, opcodes, classes, polyProtos)
+                android.util.Log.w(TAG, "✅ dex записан через починку пула прото (${polyProtos.size} шт.)")
+                return
+            } catch (second: Exception) {
+                android.util.Log.w(TAG, "♻️ Пул прото не помог: ${second.message}")
+            }
+        }
+        // Шаг 3: аварийный цикл — заглушки proto / отброс try/catch (до 64 итераций)
+        var current: List<org.jf.dexlib2.iface.ClassDef> = classes
+        val addedProtos = HashSet<String>()
+        val repairedMethods = HashSet<String>()
+        var iter = 0
+        while (true) {
+            iter++
+            if (iter > 64) throw IllegalStateException("Слишком много починок dex: " + outputDex.name)
+            try {
+                if (outputDex.exists()) outputDex.delete()
+                DexFileFactory.writeDexFile(outputDex.absolutePath, ImmutableDexFile(opcodes, current))
+                return
+            } catch (e: Exception) {
+                val protoStr = findItemNotFound(e)
+                if (protoStr != null && addedProtos.add(protoStr)) {
+                    val fixed = addProtoStub(current, protoStr) ?: throw e
+                    current = fixed
+                    android.util.Log.w(TAG, "♻️ Добавлена заглушка прото: $protoStr")
+                    continue
+                }
+                val msg = e.message ?: ""
+                if (msg.contains("code_item for method")) {
+                    val methodDesc = msg.substringAfter("code_item for method ").substringBefore(" ")
+                    if (repairedMethods.add(methodDesc)) {
+                        val repaired = repairClassList(current, methodDesc) ?: throw e
+                        current = repaired
+                        android.util.Log.w(TAG, "♻️ Починка метода $methodDesc: таблица try/catch отброшена")
+                        continue
+                    }
+                }
+                throw e
+            }
+        }
+    }
     private fun findItemNotFound(t: Throwable?): String? {
         var cur = t
         while (cur != null) {

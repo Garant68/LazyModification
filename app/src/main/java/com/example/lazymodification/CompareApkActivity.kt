@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.ArrayAdapter
 import android.widget.CheckBox
 import android.widget.LinearLayout
@@ -59,6 +60,9 @@ class CompareApkActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_compare_apk)
+
+        // 🔆 Экран не гаснет во время сравнения
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         mode = intent.getStringExtra(EXTRA_MODE) ?: "dex"
         selectFirstApk()
     }

@@ -13,11 +13,17 @@ import android.os.IBinder
 import android.os.PowerManager
 import android.provider.MediaStore
 import android.util.Log
+import android.util.Base64
 import androidx.core.app.NotificationCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.example.lazymodification.utils.ApkUtils
 import com.example.lazymodification.utils.DexPatcher
+import com.example.lazymodification.utils.StubEdit
+import com.example.lazymodification.utils.CodeEdit
+import com.example.lazymodification.utils.PatchResult
+import com.example.lazymodification.utils.SignatureKiller
 import com.example.lazymodification.utils.DpiRemove
+import com.example.lazymodification.utils.FastZipRepack
 import com.example.lazymodification.utils.SignatureConfig
 import com.example.lazymodification.utils.SigningUtils
 import com.example.lazymodification.utils.ZipOptimizer
@@ -36,8 +42,13 @@ class PatchService : Service() {
         const val EXTRA_PATCH_REMOVE_ANALYTICS = "patch_remove_analytics"
         const val EXTRA_PATCH_REMOVE_GP_SERVICES = "patch_remove_gp_services"
         const val EXTRA_PATCH_REMOVE_VPN = "patch_remove_vpn"
+        const val EXTRA_PATCH_ALLOW_SCREENSHOTS = "patch_allow_screenshots"
+        const val EXTRA_STUB_EDITS = "stub_edits"
+        const val EXTRA_CODE_EDITS = "code_edits"
         const val EXTRA_PATCH_REMOVE_INSTALLER_CHECK = "patch_remove_installer_check"
         const val EXTRA_PATCH_REMOVE_UPDATE = "patch_remove_update"
+        const val EXTRA_PATCH_REMOVE_SIGNATURE = "patch_remove_signature"
+        const val EXTRA_TOOLS_KILL_ONLY = "tools_kill_only"
         const val EXTRA_PATCH_REMOVE_LOCALES = "patch_remove_locales"
         const val EXTRA_PATCH_REMOVE_LOCALES_LIST = "patch_remove_locales_list"
         const val EXTRA_PATCH_REMOVE_DPI = "patch_remove_dpi"
@@ -105,8 +116,35 @@ class PatchService : Service() {
         val patchRemoveAnalytics = intent?.getBooleanExtra(EXTRA_PATCH_REMOVE_ANALYTICS, false) ?: false
         val patchRemoveGPServices = intent?.getBooleanExtra(EXTRA_PATCH_REMOVE_GP_SERVICES, false) ?: false
         val patchRemoveVpn = intent?.getBooleanExtra(EXTRA_PATCH_REMOVE_VPN, false) ?: false
+        val patchAllowScreenshots = intent?.getBooleanExtra(EXTRA_PATCH_ALLOW_SCREENSHOTS, false) ?: false
+        val stubEditsRaw = intent?.getStringArrayListExtra(EXTRA_STUB_EDITS)
+        val stubEdits = ArrayList<StubEdit>()
+        stubEditsRaw?.forEach { s ->
+            try {
+                val parts = s.split("|")
+                if (parts.size >= 5) {
+                    val params = if (parts[2].isEmpty()) emptyList<String>() else parts[2].split(",")
+                    stubEdits.add(StubEdit(parts[0], parts[1], params, parts[3], parts[4]))
+                }
+            } catch (_: Throwable) { }
+        }
+        val codeEditsRaw = intent?.getStringArrayListExtra(EXTRA_CODE_EDITS)
+        val codeEdits = ArrayList<CodeEdit>()
+        codeEditsRaw?.forEach { s ->
+            try {
+                val parts = s.split("|")
+                if (parts.size >= 6) {
+                    val params = if (parts[2].isEmpty()) emptyList<String>() else parts[2].split(",")
+                    val addr = parts[4].toIntOrNull() ?: return@forEach
+                    val newText = String(Base64.decode(parts[5], Base64.NO_WRAP), Charsets.UTF_8)
+                    codeEdits.add(CodeEdit(parts[0], parts[1], params, parts[3], addr, newText))
+                }
+            } catch (_: Throwable) { }
+        }
         val patchRemoveInstallerCheck = intent?.getBooleanExtra(EXTRA_PATCH_REMOVE_INSTALLER_CHECK, false) ?: false
         val patchRemoveUpdate = intent?.getBooleanExtra(EXTRA_PATCH_REMOVE_UPDATE, false) ?: false
+        val patchRemoveSignature = intent?.getBooleanExtra(EXTRA_PATCH_REMOVE_SIGNATURE, false) ?: false
+        val toolsKillOnly = intent?.getBooleanExtra(EXTRA_TOOLS_KILL_ONLY, false) ?: false
         val patchRemoveLocales = intent?.getBooleanExtra(EXTRA_PATCH_REMOVE_LOCALES, false) ?: false
         val localesToRemove = intent?.getStringArrayListExtra(EXTRA_PATCH_REMOVE_LOCALES_LIST)
         val patchRemoveDpi = intent?.getBooleanExtra(EXTRA_PATCH_REMOVE_DPI, false) ?: false
@@ -144,11 +182,14 @@ class PatchService : Service() {
                     File(apkPath),
                     patchGooglePlay, patchRemoveAds, patchRemoveAnalytics,
                     patchRemoveGPServices, patchRemoveVpn, patchRemoveInstallerCheck,
-                    patchRemoveUpdate,
+                    patchRemoveUpdate, patchAllowScreenshots,
+                    patchRemoveSignature, toolsKillOnly,
                     patchRemoveLocales, localesToRemove,
                     patchRemoveDpi, dpisToRemove,
                     patchRemoveLibs, libsToRemove,
                     patchOptimize,
+                    stubEdits,
+                    codeEdits,
                     signConfig
                 )
             } catch (e: OutOfMemoryError) {
@@ -220,18 +261,21 @@ class PatchService : Service() {
         apkFile: File,
         patchGooglePlay: Boolean, patchRemoveAds: Boolean, patchRemoveAnalytics: Boolean,
         patchRemoveGPServices: Boolean, patchRemoveVpn: Boolean, patchRemoveInstallerCheck: Boolean,
-        patchRemoveUpdate: Boolean,
+        patchRemoveUpdate: Boolean, patchAllowScreenshots: Boolean,
+        patchRemoveSignature: Boolean, toolsKillOnly: Boolean,
         patchRemoveLocales: Boolean, localesToRemove: List<String>?,
         patchRemoveDpi: Boolean, dpisToRemove: List<String>?,
         patchRemoveLibs: Boolean, libsToRemove: List<String>?,
         patchOptimize: Boolean,
+        stubEdits: List<StubEdit>,
+        codeEdits: List<CodeEdit>,
         signConfig: SignatureConfig
     ) {
         sendProgress(0)
         val totalStart = System.currentTimeMillis()
         val sizeMb = apkFile.length() / (1024.0 * 1024.0)
         sendLog(getString(R.string.log_start, apkFile.name, String.format("%.1f", sizeMb)), "INFO")
-        sendLog("🔧 GP=$patchGooglePlay, Ads=$patchRemoveAds, Analytics=$patchRemoveAnalytics, GP_Svc=$patchRemoveGPServices, VPN=$patchRemoveVpn, Installer=$patchRemoveInstallerCheck, Locales=$patchRemoveLocales, DPI=$patchRemoveDpi, Libs=$patchRemoveLibs, Optimize=$patchOptimize, Debug=auto", "INFO")
+        sendLog("🔧 GP=$patchGooglePlay, Ads=$patchRemoveAds, Analytics=$patchRemoveAnalytics, GP_Svc=$patchRemoveGPServices, VPN=$patchRemoveVpn, Installer=$patchRemoveInstallerCheck, Locales=$patchRemoveLocales, DPI=$patchRemoveDpi, Libs=$patchRemoveLibs, Optimize=$patchOptimize, Update=$patchRemoveUpdate, Shots=$patchAllowScreenshots, Stubs=${stubEdits.size}, CodeEdits=${codeEdits.size}, Sign=$patchRemoveSignature, Debug=${if (toolsKillOnly) "off" else "auto"}", "INFO")
 
         if (patchRemoveLocales && !localesToRemove.isNullOrEmpty()) sendLog(getString(R.string.log_locales_selected, localesToRemove.size), "INFO")
         if (patchRemoveDpi && !dpisToRemove.isNullOrEmpty()) sendLog(getString(R.string.log_dpi_selected, dpisToRemove.joinToString()), "INFO")
@@ -342,7 +386,7 @@ class PatchService : Service() {
             }
 
             val needsDexPatching = patchGooglePlay || patchRemoveAds || patchRemoveAnalytics ||
-                    patchRemoveGPServices || patchRemoveVpn || patchRemoveInstallerCheck || patchRemoveUpdate || patchOptimize
+                    patchRemoveGPServices || patchRemoveVpn || patchRemoveInstallerCheck || patchRemoveUpdate || patchRemoveSignature || patchOptimize || patchAllowScreenshots || stubEdits.isNotEmpty() || codeEdits.isNotEmpty()
 
             if (needsDexPatching) {
                 sendLog(getString(R.string.status_extracting_dex), "INFO")
@@ -354,7 +398,7 @@ class PatchService : Service() {
 
                 val patchedDexMap = HashMap<String, File>()
                 var totalGP = 0; var totalAds = 0; var totalAnalytics = 0
-                var totalGPServices = 0; var totalVpn = 0; var totalInstallerCheck = 0; var totalDebug = 0; var totalUpdate = 0
+                var totalGPServices = 0; var totalVpn = 0; var totalInstallerCheck = 0; var totalDebug = 0; var totalUpdate = 0; var totalScreenshots = 0; var totalStubs = 0; var totalCodeEdits = 0
 
                 val dexCount = dexFiles.size
                 val progressPerDex = if (dexCount > 0) 50.0 / dexCount else 0.0
@@ -366,13 +410,42 @@ class PatchService : Service() {
 
                     val patchedDex = File(workDir, "patched_${dex.name}")
                     try {
-                        val result = DexPatcher.patchDex(
-                            inputDex = dex, outputDex = patchedDex,
-                            patchGooglePlay = patchGooglePlay, patchRemoveAds = patchRemoveAds,
-                            patchRemoveAnalytics = patchRemoveAnalytics, patchRemoveGPServices = patchRemoveGPServices,
-                            patchRemoveVpn = patchRemoveVpn, patchRemoveInstallerCheck = patchRemoveInstallerCheck, patchRemoveDebug = true,
-                            patchRemoveUpdate = patchRemoveUpdate
-                        )
+                        var stubsThisDex = 0
+                        var codeEditsThisDex = 0
+                        val result = if (stubEdits.isEmpty() && codeEdits.isEmpty()) {
+                            DexPatcher.patchDex(
+                                inputDex = dex, outputDex = patchedDex,
+                                patchGooglePlay = patchGooglePlay, patchRemoveAds = patchRemoveAds,
+                                patchRemoveAnalytics = patchRemoveAnalytics, patchRemoveGPServices = patchRemoveGPServices,
+                                patchRemoveVpn = patchRemoveVpn, patchRemoveInstallerCheck = patchRemoveInstallerCheck, patchRemoveDebug = !toolsKillOnly,
+                                patchRemoveUpdate = patchRemoveUpdate,
+                                patchAllowScreenshots = patchAllowScreenshots
+                            )
+                        } else {
+                            var cur = dex
+                            var tmp: File? = null
+                            if (stubEdits.isNotEmpty()) {
+                                val t1 = File(workDir, "stub1_${dex.name}")
+                                stubsThisDex = DexPatcher.stubMethods(cur, t1, stubEdits)
+                                totalStubs += stubsThisDex
+                                cur = t1
+                                tmp = t1
+                            }
+                            if (codeEdits.isNotEmpty()) {
+                                val cnt = DexPatcher.applyCodeEdits(cur, patchedDex, codeEdits)
+                                if (cnt < 0) {
+                                    sendLog("⚠️ ${dex.name}: правки кода не прошли проверку — dex сохранён без правок", "WARNING")
+                                } else {
+                                    codeEditsThisDex = cnt
+                                    totalCodeEdits += cnt
+                                }
+                                tmp?.delete()
+                            } else {
+                                cur.copyTo(patchedDex, overwrite = true)
+                                tmp?.delete()
+                            }
+                            PatchResult()
+                        }
 
                         totalGP += result.googlePlayPatched
                         totalAds += result.adsPatched
@@ -382,11 +455,12 @@ class PatchService : Service() {
                         totalInstallerCheck += result.installerCheckPatched
                         totalDebug += result.debugItemsRemoved
                         totalUpdate += result.updateCheckPatched
+                        totalScreenshots += result.screenshotsPatched
 
                         patchedDexMap[dex.name] = patchedDex
 
                         val elapsed = System.currentTimeMillis() - dexStart
-                        sendLog("  GP:${result.googlePlayPatched} Ads:${result.adsPatched} Analytics:${result.analyticsPatched} GP_Svc:${result.gpServicesPatched} VPN:${result.vpnPatched} Installer:${result.installerCheckPatched} Update:${result.updateCheckPatched} Debug:${result.debugItemsRemoved} (${elapsed}ms)", "INFO")
+                        sendLog("  GP:${result.googlePlayPatched} Ads:${result.adsPatched} Analytics:${result.analyticsPatched} GP_Svc:${result.gpServicesPatched} VPN:${result.vpnPatched} Installer:${result.installerCheckPatched} Update:${result.updateCheckPatched} Shots:${result.screenshotsPatched} Debug:${result.debugItemsRemoved}" + (if (stubEdits.isNotEmpty()) " Stubs:$stubsThisDex" else "") + (if (codeEditsThisDex > 0) " Code:$codeEditsThisDex" else "") + " (${elapsed}ms)", "INFO")
                     } catch (e: OutOfMemoryError) {
                         sendLog(getString(R.string.log_oom_dex, dex.name, dexSizeMb), "ERROR")
                         throw e
@@ -399,7 +473,9 @@ class PatchService : Service() {
                     sendProgress((21 + progressPerDex * (i + 1)).toInt().coerceAtMost(71))
                 }
 
-                if (totalGP + totalAds + totalAnalytics + totalGPServices + totalVpn + totalInstallerCheck > 0) anyApplied = true
+                if (totalGP + totalAds + totalAnalytics + totalGPServices + totalVpn + totalInstallerCheck + totalScreenshots > 0) anyApplied = true
+                if (totalStubs > 0) anyApplied = true
+                if (totalCodeEdits > 0) anyApplied = true
                 if (patchGooglePlay) sendLog("✅ Google Play: $totalGP", if (totalGP > 0) "SUCCESS" else "WARNING")
                 if (patchRemoveAds) sendLog(getString(R.string.log_ads, totalAds), if (totalAds > 0) "SUCCESS" else "WARNING")
                 if (patchRemoveAnalytics) sendLog(getString(R.string.log_analytics, totalAnalytics), if (totalAnalytics > 0) "SUCCESS" else "WARNING")
@@ -407,7 +483,33 @@ class PatchService : Service() {
                 if (patchRemoveVpn) sendLog("✅ VPN Detection: $totalVpn", if (totalVpn > 0) "SUCCESS" else "WARNING")
                 if (patchRemoveInstallerCheck) sendLog("✅ Installer check: $totalInstallerCheck", if (totalInstallerCheck > 0) "SUCCESS" else "WARNING")
                 if (patchRemoveUpdate) sendLog(getString(R.string.log_update_check, totalUpdate), if (totalUpdate > 0) "SUCCESS" else "WARNING")
+                if (patchAllowScreenshots) sendLog("✅ Скриншоты: $totalScreenshots", if (totalScreenshots > 0) "SUCCESS" else "WARNING")
+                if (stubEdits.isNotEmpty()) sendLog(getString(R.string.stub_log_result, totalStubs, stubEdits.size - totalStubs), if (totalStubs > 0) "SUCCESS" else "WARNING")
+                if (codeEdits.isNotEmpty()) sendLog(getString(R.string.replace_log_result, totalCodeEdits, codeEdits.size), if (totalCodeEdits > 0) "SUCCESS" else "WARNING")
                 sendLog(getString(R.string.log_debug, totalDebug), if (totalDebug > 0) "SUCCESS" else "INFO")
+
+                if (patchRemoveSignature) {
+                    sendLog(getString(R.string.log_signature_kill_start), "INFO")
+                    val killResult = try {
+                        SignatureKiller.inject(
+                            context = this,
+                            originalApk = apkFile,
+                            dexMap = patchedDexMap,
+                            workDir = workDir,
+                            log = { m -> sendLog(m, "INFO") }
+                        )
+                    } catch (t: Throwable) {
+                        SignatureKiller.Result(false, t.message ?: "?")
+                    }
+                    if (killResult.ok) {
+                        anyApplied = true
+                        sendLog(getString(R.string.log_signature_kill_ok), "SUCCESS")
+                    } else {
+                        sendLog(getString(R.string.log_signature_kill_fail, killResult.message), "ERROR")
+                        sendProgress(0)
+                        return
+                    }
+                }
 
                 if (patchRemoveUpdate && totalUpdate == 0 && !anyApplied && !patchOptimize) {
                     sendLog(getString(R.string.log_update_not_found_norebuild), "WARNING")
@@ -417,33 +519,45 @@ class PatchService : Service() {
 
                 sendLog(getString(R.string.status_repacking), "INFO")
                 val repackedApk = File(workDir, "repacked.apk")
+                val repackStart = System.currentTimeMillis()
+                var fastPacked = false
+                var cleanedApk = File(workDir, "cleaned.apk")
                 try {
-                    ApkUtils.repackApkWithMultipleDex(workingApk, patchedDexMap, repackedApk)
-                    if (!repackedApk.exists() || repackedApk.length() == 0L) {
+                    try {
+                        // ⚡ Быстро: сырое копирование + замена DEX + очистка + выравнивание за один проход
+                        val counts = FastZipRepack.repack(workingApk, patchedDexMap, cleanedApk, applyClean = true)
+                        sendLog(getString(R.string.status_cleaning_kotlin), "INFO")
+                        sendLog(getString(R.string.log_kept_removed, counts.kept, counts.removed), "SUCCESS")
+                        fastPacked = true
+                    } catch (t: Throwable) {
+                        Log.w(TAG, "⚡ FastZipRepack: fallback на ARSCLib", t)
+                        ApkUtils.repackApkWithMultipleDex(workingApk, patchedDexMap, repackedApk)
+                        if (!repackedApk.exists() || repackedApk.length() == 0L) {
+                            throw Exception("Repack failed")
+                        }
+                        sendLog(getString(R.string.log_repacked_mb, String.format("%.1f", repackedApk.length() / (1024.0 * 1024.0))), "SUCCESS")
+                        sendLog(getString(R.string.status_cleaning_kotlin), "INFO")
+                        try {
+                            val (kept, removed) = cleanApkContents(repackedApk, cleanedApk)
+                            sendLog(getString(R.string.log_kept_removed, kept, removed), "SUCCESS")
+                        } catch (e: Exception) {
+                            sendLog(getString(R.string.log_cleanup_error, e.message), "WARNING")
+                            repackedApk.copyTo(cleanedApk, overwrite = true)
+                        }
+                    }
+                    if (!cleanedApk.exists() || cleanedApk.length() == 0L) {
                         throw Exception("Repack failed")
                     }
-                    sendLog(getString(R.string.log_repacked_mb, String.format("%.1f", repackedApk.length() / (1024.0 * 1024.0))), "SUCCESS")
+                    sendLog("⚡ Перепаковка: ${System.currentTimeMillis() - repackStart} ms, ${String.format("%.1f", cleanedApk.length() / (1024.0 * 1024.0))} MB", "SUCCESS")
                 } finally {
                     // ✅ Удаляем патченные DEX и оригинал сразу
                     patchedDexMap.values.forEach { it.delete() }
                     patchedDexMap.clear()
                     workingApk.delete()
-                    System.gc()
-                }
-                sendProgress(73)
-
-                sendLog(getString(R.string.status_cleaning_kotlin), "INFO")
-                var cleanedApk = File(workDir, "cleaned.apk")
-                try {
-                    val (kept, removed) = cleanApkContents(repackedApk, cleanedApk)
-                    sendLog(getString(R.string.log_kept_removed, kept, removed), "SUCCESS")
-                } catch (e: Exception) {
-                    sendLog(getString(R.string.log_cleanup_error, e.message), "WARNING")
-                    repackedApk.copyTo(cleanedApk, overwrite = true)
-                } finally {
                     repackedApk.delete()
                     System.gc()
                 }
+                sendProgress(73)
                 sendProgress(80)
 
                 if (patchOptimize) {
@@ -455,6 +569,7 @@ class PatchService : Service() {
                         if (savedBytes > 0 && optimizedApk.exists()) {
                             cleanedApk.delete()
                             cleanedApk = optimizedApk
+                            fastPacked = false
                             sendLog("✅ Оптимизировано: -$savedBytes байт", "SUCCESS")
                         } else {
                             optimizedApk.delete()
@@ -466,12 +581,22 @@ class PatchService : Service() {
                     }
                 }
 
-                sendLog("📐 ZipAlign...", "INFO")
                 val alignedApk = File(workDir, "aligned.apk")
                 try {
-                    zipAlignWithARSCLib(cleanedApk, alignedApk)
-                    if (!alignedApk.exists() || alignedApk.length() == 0L) throw Exception("ZipAlign failed")
-                    sendLog("✅ ZipAlign: ${String.format("%.1f", alignedApk.length() / (1024.0 * 1024.0))} MB", "SUCCESS")
+                    if (fastPacked) {
+                        // Уже очищено и выровнено за один проход — повторная пересборка не нужна
+                        if (!cleanedApk.renameTo(alignedApk)) {
+                            cleanedApk.copyTo(alignedApk, overwrite = true)
+                            cleanedApk.delete()
+                        }
+                        if (!alignedApk.exists() || alignedApk.length() == 0L) throw Exception("ZipAlign failed")
+                        sendLog("✅ ZipAlign: ${String.format("%.1f", alignedApk.length() / (1024.0 * 1024.0))} MB", "SUCCESS")
+                    } else {
+                        sendLog("📐 ZipAlign...", "INFO")
+                        zipAlignWithARSCLib(cleanedApk, alignedApk)
+                        if (!alignedApk.exists() || alignedApk.length() == 0L) throw Exception("ZipAlign failed")
+                        sendLog("✅ ZipAlign: ${String.format("%.1f", alignedApk.length() / (1024.0 * 1024.0))} MB", "SUCCESS")
+                    }
                 } finally {
                     cleanedApk.delete()
                     System.gc()
@@ -483,7 +608,11 @@ class PatchService : Service() {
                     sendLog(getString(R.string.saving_original_signature_progress), "INFO")
                     val preservedApk = File(workDir, "presigned.apk")
                     SigningUtils.preserveOriginalSignature(apkFile, alignedApk, preservedApk)
-                    sendLog(getString(R.string.signed_preserved_signinfo), "SUCCESS")
+                    if (SigningUtils.hasSignatureData(preservedApk)) {
+                        sendLog(getString(R.string.signed_preserved_signinfo), "SUCCESS")
+                    } else {
+                        sendLog(getString(R.string.original_signature_not_saved), "WARNING")
+                    }
                     preservedApk
                 } else {
                     val signedApk = File(workDir, "signed.apk")
@@ -518,7 +647,12 @@ class PatchService : Service() {
                     sendLog("📐 ZipAlign...", "INFO")
                     val alignedApk = File(workDir, "aligned.apk")
                     try {
-                        zipAlignWithARSCLib(workingApk, alignedApk)
+                        try {
+                            FastZipRepack.repack(workingApk, emptyMap<String, File>(), alignedApk, applyClean = false)
+                        } catch (t: Throwable) {
+                            Log.w(TAG, "⚡ FastZipRepack (align): fallback", t)
+                            zipAlignWithARSCLib(workingApk, alignedApk)
+                        }
                         if (!alignedApk.exists() || alignedApk.length() == 0L) throw Exception("ZipAlign failed")
                         sendLog("✅ ZipAlign: ${String.format("%.1f", alignedApk.length() / (1024.0 * 1024.0))} MB", "SUCCESS")
                     } catch (e: Exception) {
@@ -535,7 +669,11 @@ class PatchService : Service() {
                         sendLog(getString(R.string.saving_original_signature_progress), "INFO")
                         val preservedApk = File(workDir, "presigned.apk")
                         SigningUtils.preserveOriginalSignature(apkFile, alignedApk, preservedApk)
-                        sendLog(getString(R.string.signed_preserved_signinfo), "SUCCESS")
+                        if (SigningUtils.hasSignatureData(preservedApk)) {
+                            sendLog(getString(R.string.signed_preserved_signinfo), "SUCCESS")
+                        } else {
+                            sendLog(getString(R.string.original_signature_not_saved), "WARNING")
+                        }
                         preservedApk
                     } else {
                         val signedApk = File(workDir, "signed.apk")

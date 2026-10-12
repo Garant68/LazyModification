@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
 import android.view.View
+import android.view.WindowManager
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
@@ -172,6 +173,9 @@ class LogActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         ThemeHelper.apply(this)
         setContentView(R.layout.activity_log)
+
+        // 🔆 Экран не гаснет, пока открыт лог патчинга
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         tvLog = findViewById(R.id.tvLog)
         scrollView = findViewById(R.id.scrollView)

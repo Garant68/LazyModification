@@ -100,7 +100,7 @@
     <string name="status_reading_locales">⏳ Чтение языков...</string>
     <string name="done">✅ Готово!</string>
     <string name="icon_selected">✅ Иконка выбрана. Можно сохранять.</string>
-    <string name="signed_preserved_signinfo">✅ Оригинальная подпись сохранена</string>
+    <string name="signed_preserved_signinfo">✅ Сохранены данные оригинальной подписи</string>
     <string name="signed">✅ Подписано</string>
     <string name="err_keystore_not_selected">❌ Keystore не выбран</string>
     <string name="oom_apk_too_large">❌ OutOfMemoryError: APK слишком большой для обработки</string>
@@ -204,7 +204,7 @@
     <string name="status_removing_dpi">📱 Удаление DPI графики...</string>
     <string name="status_signing_apk">🔐 Подпись APK...</string>
     <string name="status_signing">🔐 Подпись...</string>
-    <string name="original_signature_preserved">🔑 Оригинальная подпись сохранена</string>
+    <string name="original_signature_preserved">🔑 Сохранены данные оригинальной подписи</string>
     <string name="saving_original_signature">🔑 Сохранение оригинальной подписи</string>
     <string name="saving_original_signature_progress">🔑 Сохранение оригинальной подписи...</string>
     <string name="temp_files_removed">🗑️ Временные файлы удалены</string>
@@ -413,4 +413,58 @@
     <string name="sig_err_years">❌ Срок действия: укажите целое число от 1 до 100</string>
     <string name="sig_field_type">Тип хранилища</string>
     <string name="sig_type_desc">PKCS12 — современный формат, рекомендуется. JKS — старый формат Java (для совместимости со старыми инструментами).</string>
-</resources>
+    <string name="convert_nosign_warning_title">⚠️ Сохранение подписи</string>
+    <string name="convert_nosign_warning">При конвертации APKS/XAPK оригинальную подпись сохранить невозможно: современные файлы подписаны схемами V2/V3, которые перестают действовать после объединения сплитов.\n\nИтоговый файл выйдет БЕЗ подписи — инструменты (например, «Удаление проверки подписи» в MT Manager) не смогут с ним работать.\n\nРекомендуется подписать файл своим ключом.</string>
+    <string name="convert_nosign_sign_button">Подписать своим ключом</string>
+    <string name="convert_nosign_continue">Продолжить без подписи</string>
+    <string name="original_signature_not_saved">⚠️ Оригинальная подпись не сохранена — в исходнике нет V1-подписи. Файл без подписи: подпишите его своим ключом перед дальнейшей обработкой.</string>
+    <string name="log_signature_kill_start">🛡️ Удаление проверки подписи: внедрение движка...</string>
+    <string name="log_signature_kill_ok">🛡️ Проверка подписи отключена (движок внедрён)</string>
+    <string name="log_signature_kill_fail">❌ Удаление проверки подписи: %1$s</string>
+    <string name="tools_kill_section">🛡️ Проверка подписи</string>
+    <string name="tools_kill_desc">Встраивает движок, отключающий проверки подписи (совместимо по результату с MT Manager). Выберите APK, в котором сохранена оригинальная подпись — приложение будет запускаться, даже если подпись изменена.</string>
+    <string name="tools_kill_button">Удалить проверку подписи</string>
+    <string name="tools_kill_note">ℹ️ Нужен файл с оригинальной подписью (оригинал приложения или собранный с сохранением подписи). После обработки подпишите APK как обычно.</string>
+    <string name="allow_screenshots">Разрешить скриншоты</string>
+    <string name="tools_dex_editor">Редактор Dex</string>
+    <string name="dex_editor_title">Редактор dex</string>
+    <string name="dex_editor_search_hint">Поиск класса…</string>
+    <string name="dex_editor_loading">Чтение dex…</string>
+    <string name="dex_editor_classes_found">Классов: %1$d</string>
+    <string name="dex_editor_no_methods">В классе нет методов, которые можно заглушить</string>
+    <string name="dex_editor_stub_title">Чем заглушить метод?</string>
+    <string name="dex_editor_warn">Заглушка отключит метод целиком. Осторожно с важными методами — приложение может сломаться.</string>
+    <string name="dex_editor_confirm">Заглушить %1$s → %2$s?</string>
+    <string name="dex_editor_added">Добавлено: %1$s → %2$s (в очереди: %3$d)</string>
+    <string name="dex_editor_already">Этот метод уже в очереди</string>
+    <string name="dex_editor_apply">Применить (%1$d)</string>
+    <string name="dex_editor_clear">Очистить очередь</string>
+    <string name="dex_editor_queue_hint">Правок в очереди: %1$d</string>
+    <string name="stub_log_result">✅ Заглушено методов: %1$d (не найдено: %2$d)</string>    <string name="dex_editor_mode_class">Классы</string>
+    <string name="dex_editor_mode_method">Методы</string>
+    <string name="dex_editor_mode_string">Строки</string>
+    <string name="dex_editor_search_method_hint">Поиск метода…</string>
+    <string name="dex_editor_search_string_hint">Поиск строки в коде…</string>
+    <string name="dex_editor_indexing">Индексирую методы…</string>
+    <string name="dex_editor_searching">Поиск…</string>
+    <string name="dex_editor_searching_progress">Поиск… (%1$d/%2$d)</string>
+    <string name="dex_editor_found">Найдено: %1$d</string>
+    <string name="dex_editor_not_found">Ничего не найдено</string>    <string name="dex_editor_no_pkg">(без пакета)</string>
+    <string name="code_title">Код метода</string>
+    <string name="code_edit_title">Изменить инструкцию</string>
+    <string name="code_edit_warn">Можно заменить на любую инструкцию того же размера (включая смену опкода): регистры, значения, ссылки. Размер менять нельзя.</string>
+    <string name="code_edits_n">правок: %1$d</string>
+    <string name="dex_editor_replace_added">Добавлено правок кода: %1$d</string>
+    <string name="replace_log_result">✅ Правок кода: %1$d (из %2$d)</string>
+    <string name="code_not_found">Метод не найден</string>    <string name="code_menu_title">Инструкция</string>
+    <string name="code_menu_goto">Перейти к методу</string>
+    <string name="code_copy_line">Копировать строку</string>
+    <string name="code_copy_all">Копировать весь метод</string>
+    <string name="copy_done">Скопировано</string>
+    <string name="code_clear_btn">Очистить метод</string>
+    <string name="code_clear_title">Очистить метод?</string>
+    <string name="code_clear_warn">Код метода будет заменён на возврат выбранного значения. Осторожно с важными методами — приложение может сломаться.</string>
+    <string name="code_clear_done">Метод будет очищен: %1$s</string>
+    <string name="code_clear_state">очистка: %1$s</string>
+    <string name="code_clear_cancelled">Очистка метода отменена</string>    <string name="search_history_title">Сохранённые запросы</string>
+    <string name="search_history_empty">Сохранённых запросов нет</string></resources>

@@ -16,6 +16,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.example.lazymodification.utils.SignatureConfig
 import com.example.lazymodification.utils.SigningUtils
@@ -145,6 +146,22 @@ class ConversionActivity : AppCompatActivity() {
     }
 
     private fun startConversion(config: SignatureConfig) {
+        if (config.noSign) {
+            // Для конвертации APKS/XAPK сохранение оригинальной подписи невозможно —
+            // содержимое объединяется, V2/V3-подписи перестают действовать.
+            AlertDialog.Builder(this)
+                .setTitle(R.string.convert_nosign_warning_title)
+                .setMessage(R.string.convert_nosign_warning)
+                .setPositiveButton(R.string.convert_nosign_sign_button) { _, _ -> showSigningDialog() }
+                .setNegativeButton(R.string.convert_nosign_continue) { _, _ -> runConversion(config) }
+                .setCancelable(false)
+                .show()
+        } else {
+            runConversion(config)
+        }
+    }
+
+    private fun runConversion(config: SignatureConfig) {
         val inputUri = selectedFileUri ?: return
         val fileName = selectedFileName ?: return
         val outputName = fileName.replace(Regex("\\.(apks|xapk)$", RegexOption.IGNORE_CASE), "") + ".apk"
@@ -231,7 +248,12 @@ class ConversionActivity : AppCompatActivity() {
 
             val finalFile = if (config.noSign) {
                 val preservedFile = File(tempDir, "preserved.apk")
-                SigningUtils.preserveOriginalSignature(tempXapk, mergedFile, preservedFile)
+                val baseModule = pickBaseModule(extractDir)
+                if (baseModule != null) {
+                    SigningUtils.preserveOriginalSignature(baseModule, mergedFile, preservedFile)
+                } else {
+                    mergedFile.copyTo(preservedFile, overwrite = true)
+                }
                 mergedFile.delete()
                 preservedFile
             } else {
@@ -241,11 +263,15 @@ class ConversionActivity : AppCompatActivity() {
                 signedFile
             }
 
+            val realSignPreserved = config.noSign && SigningUtils.hasSignatureData(finalFile)
+
             FileSaver.saveApk(this, finalFile, outputName)
             finalFile.delete()
 
-            val signInfo = if (config.noSign) getString(R.string.original_signature_preserved)
-            else "🔐 V1=${config.signV1}, V2=${config.signV2}, V3=${config.signV3}${if (config.useCustom) " (своя подпись)" else ""}"
+            val signInfo = if (config.noSign) {
+                if (realSignPreserved) getString(R.string.original_signature_preserved)
+                else getString(R.string.original_signature_not_saved)
+            } else "🔐 V1=${config.signV1}, V2=${config.signV2}, V3=${config.signV3}${if (config.useCustom) " (своя подпись)" else ""}"
 
             val exactLog = """
                 📦 ЭТАП 1: Извлечение APK из XAPK
@@ -271,6 +297,13 @@ class ConversionActivity : AppCompatActivity() {
             tempDir.deleteRecursively()
             System.gc()
         }
+    }
+
+    /** Базовый модуль XAPK (без "config."/"split") — источник оригинальной V1-подписи. */
+    private fun pickBaseModule(dir: File): File? {
+        val apks = dir.listFiles { f -> f.isFile && f.name.endsWith(".apk", ignoreCase = true) } ?: return null
+        return apks.firstOrNull { !it.name.contains("config.", ignoreCase = true) && !it.name.startsWith("split", ignoreCase = true) }
+            ?: apks.firstOrNull()
     }
 
     private fun convertApks(inputUri: Uri, outputName: String, config: SignatureConfig) {
@@ -309,11 +342,15 @@ class ConversionActivity : AppCompatActivity() {
                 tempSigned
             }
 
+            val realSignPreserved = config.noSign && SigningUtils.hasSignatureData(finalFile)
+
             FileSaver.saveApk(this, finalFile, outputName)
             finalFile.delete()
 
-            val signInfo = if (config.noSign) getString(R.string.original_signature_preserved)
-            else " V1=${config.signV1}, V2=${config.signV2}, V3=${config.signV3}${if (config.useCustom) " (своя подпись)" else ""}"
+            val signInfo = if (config.noSign) {
+                if (realSignPreserved) getString(R.string.original_signature_preserved)
+                else getString(R.string.original_signature_not_saved)
+            } else " V1=${config.signV1}, V2=${config.signV2}, V3=${config.signV3}${if (config.useCustom) " (своя подпись)" else ""}"
 
             val exactLog = """
                 📦 ЭТАП 1: Конвертация split APK

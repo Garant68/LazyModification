@@ -19,6 +19,7 @@ import com.android.apksig.ApkSigner
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.RandomAccessFile
 import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.Provider
@@ -137,6 +138,25 @@ object SigningUtils {
         }
     }
 
+    /** Проверяет наличие V1-подписи (META-INF/MANIFEST.MF) в APK. */
+    fun hasV1Signature(apk: File): Boolean {
+        return try {
+            ZipFile(apk).use { zip -> zip.getEntry("META-INF/MANIFEST.MF") != null }
+        } catch (t: Throwable) {
+            false
+        }
+    }
+
+    /** Проверяет наличие ДАННЫХ оригинальной подписи: v1-файлы или APK Signing Block. */
+    fun hasSignatureData(apk: File): Boolean {
+        return try {
+            if (hasV1Signature(apk)) return true
+            extractSigningBlock(apk) != null
+        } catch (t: Throwable) {
+            false
+        }
+    }
+
     private fun loadKeyStoreAuto(file: File, password: CharArray, preferredType: String): Pair<KeyStore, String> {
         ensureBouncyCastle()
         val candidates = listOf(preferredType, "PKCS12", "JKS", "BKS").distinct()
@@ -169,6 +189,7 @@ object SigningUtils {
 
         if (metaInfNames.isEmpty()) {
             processedApk.copyTo(outputApk, overwrite = true)
+            copySigningBlock(originalApk, outputApk)
             return
         }
 
@@ -218,6 +239,231 @@ object SigningUtils {
                     zos.closeEntry()
                 }
             }
+        }
+
+        // Перенос APK Signing Block (данные оригинальной подписи)
+        copySigningBlock(originalApk, outputApk)
+    }
+
+    /** Переносит APK Signing Block из оригинала в результат (ошибки игнорируются). */
+    private fun copySigningBlock(originalApk: File, outputApk: File) {
+        try {
+            val block = extractSigningBlock(originalApk) ?: return
+            insertSigningBlockIntoApk(outputApk, block)
+        } catch (t: Throwable) {
+            // не критично: результат останется без данных подписи
+        }
+    }
+
+    // ============================================================
+    // ✅ ДАННЫЕ ОРИГИНАЛЬНОЙ ПОДПИСИ (APK SIGNING BLOCK)
+    // ============================================================
+
+    private const val EOCD_SIG_LONG = 0x06054b50L
+    private const val ZIP64_LOCATOR_SIG_LONG = 0x07064b50L
+    private const val ZIP64_EOCD_SIG_LONG = 0x06064b50L
+
+    private fun readU32LE(b: ByteArray, off: Int): Long =
+        (b[off].toLong() and 0xFF) or ((b[off + 1].toLong() and 0xFF) shl 8) or
+            ((b[off + 2].toLong() and 0xFF) shl 16) or ((b[off + 3].toLong() and 0xFF) shl 24)
+
+    private fun readU64LE(b: ByteArray, off: Int): Long {
+        var v = 0L
+        for (i in 7 downTo 0) {
+            v = (v shl 8) or (b[off + i].toLong() and 0xFF)
+        }
+        return v
+    }
+
+    /** Находит смещение начала Central Directory в zip/apk (или -1). */
+    private fun findCentralDirOffset(file: File): Long {
+        val len = file.length()
+        if (len < 22) return -1
+        val tailSize = minOf(len, 65557L).toInt()
+        val tail = ByteArray(tailSize)
+        RandomAccessFile(file, "r").use { raf ->
+            raf.seek(len - tailSize)
+            raf.readFully(tail)
+        }
+        for (i in tail.size - 22 downTo 0) {
+            if (readU32LE(tail, i) != EOCD_SIG_LONG) continue
+            val commentLen = (tail[i + 20].toInt() and 0xFF) or ((tail[i + 21].toInt() and 0xFF) shl 8)
+            val eocdAbs = (len - tailSize) + i
+            if (eocdAbs + 22 + commentLen != len) continue
+            var cdOffset = readU32LE(tail, i + 16)
+            if (cdOffset == 0xFFFFFFFFL) {
+                // ZIP64: читаем локатор и EOCD64
+                val locAbs = eocdAbs - 20
+                if (locAbs >= 0) {
+                    try {
+                        RandomAccessFile(file, "r").use { raf ->
+                            val loc = ByteArray(20)
+                            raf.seek(locAbs)
+                            raf.readFully(loc)
+                            if (readU32LE(loc, 0) == ZIP64_LOCATOR_SIG_LONG) {
+                                val eocd64Pos = readU64LE(loc, 8)
+                                val hdr = ByteArray(56)
+                                raf.seek(eocd64Pos)
+                                raf.readFully(hdr)
+                                if (readU32LE(hdr, 0) == ZIP64_EOCD_SIG_LONG) {
+                                    cdOffset = readU64LE(hdr, 48)
+                                }
+                            }
+                        }
+                    } catch (t: Throwable) {
+                        // оставим cdOffset как есть
+                    }
+                }
+            }
+            return cdOffset
+        }
+        return -1
+    }
+
+    /** Извлекает APK Signing Block из файла или возвращает null. */
+    fun extractSigningBlock(file: File): ByteArray? {
+        return try {
+            val cdStart = findCentralDirOffset(file)
+            if (cdStart < 32 || cdStart > file.length()) return null
+            RandomAccessFile(file, "r").use { raf ->
+                val magic = ByteArray(16)
+                raf.seek(cdStart - 16)
+                raf.readFully(magic)
+                if (String(magic, Charsets.US_ASCII) != "APK Sig Block 42") return null
+                val sizeBuf = ByteArray(8)
+                raf.seek(cdStart - 24)
+                raf.readFully(sizeBuf)
+                val size2 = readU64LE(sizeBuf, 0)
+                if (size2 < 24 || size2 > cdStart - 8) return null
+                val blockStart = cdStart - 8 - size2
+                raf.seek(blockStart)
+                raf.readFully(sizeBuf)
+                if (readU64LE(sizeBuf, 0) != size2) return null
+                val block = ByteArray(size2.toInt() + 8)
+                raf.seek(blockStart)
+                raf.readFully(block)
+                block
+            }
+        } catch (t: Throwable) {
+            null
+        }
+    }
+
+    /** Вставляет APK Signing Block перед Central Directory. false — при любой проблеме (файл не изменяется). */
+    fun insertSigningBlockIntoApk(apk: File, block: ByteArray): Boolean {
+        if (block.isEmpty()) return false
+        val parent = apk.parentFile ?: return false
+        val tmpFile = File(parent, apk.name + ".blk.tmp")
+        try {
+            val cdStart = findCentralDirOffset(apk)
+            if (cdStart <= 0 || cdStart > apk.length()) return false
+            val origCount = try { ZipFile(apk).use { it.size() } } catch (t: Throwable) { return false }
+
+            FileInputStream(apk).use { fis ->
+                FileOutputStream(tmpFile).use { fos ->
+                    val buf = ByteArray(1 shl 20)
+                    var remaining = cdStart
+                    while (remaining > 0) {
+                        val n = fis.read(buf, 0, minOf(buf.size.toLong(), remaining).toInt())
+                        if (n < 0) return false
+                        fos.write(buf, 0, n)
+                        remaining -= n
+                    }
+                    fos.write(block)
+                    var n = fis.read(buf)
+                    while (n >= 0) {
+                        if (n > 0) fos.write(buf, 0, n)
+                        n = fis.read(buf)
+                    }
+                }
+            }
+
+            if (!patchCentralDirOffset(tmpFile, block.size.toLong(), cdStart)) {
+                tmpFile.delete()
+                return false
+            }
+            val back = extractSigningBlock(tmpFile)
+            if (back == null || !back.contentEquals(block)) {
+                tmpFile.delete()
+                return false
+            }
+            val newCount = try { ZipFile(tmpFile).use { it.size() } } catch (t: Throwable) { -1 }
+            if (newCount != origCount) {
+                tmpFile.delete()
+                return false
+            }
+
+            val bak = File(parent, apk.name + ".blk.bak")
+            if (bak.exists()) bak.delete()
+            if (!apk.renameTo(bak)) {
+                tmpFile.delete()
+                return false
+            }
+            if (!tmpFile.renameTo(apk)) {
+                bak.renameTo(apk)
+                tmpFile.delete()
+                return false
+            }
+            bak.delete()
+            return true
+        } catch (t: Throwable) {
+            if (tmpFile.exists()) tmpFile.delete()
+            return false
+        }
+    }
+
+    /** Сдвигает в файле смещение Central Directory на delta (EOCD и, при наличии, ZIP64-записи). */
+    private fun patchCentralDirOffset(file: File, delta: Long, expectedOldCd: Long): Boolean {
+        return try {
+            val len = file.length()
+            val tailSize = minOf(len, 65557L).toInt()
+            val tail = ByteArray(tailSize)
+            RandomAccessFile(file, "r").use { raf ->
+                raf.seek(len - tailSize)
+                raf.readFully(tail)
+            }
+            for (i in tail.size - 22 downTo 0) {
+                if (readU32LE(tail, i) != EOCD_SIG_LONG) continue
+                val commentLen = (tail[i + 20].toInt() and 0xFF) or ((tail[i + 21].toInt() and 0xFF) shl 8)
+                val eocdAbs = (len - tailSize) + i
+                if (eocdAbs + 22 + commentLen != len) continue
+                RandomAccessFile(file, "rw").use { raf ->
+                    val cdField = readU32LE(tail, i + 16)
+                    if (cdField != 0xFFFFFFFFL) {
+                        if (cdField != expectedOldCd) return false
+                        val newCd = cdField + delta
+                        val b4 = ByteArray(4) { idx -> ((newCd ushr (8 * idx)) and 0xFF).toByte() }
+                        raf.seek(eocdAbs + 16)
+                        raf.write(b4)
+                    } else {
+                        val locAbs = eocdAbs - 20
+                        if (locAbs < 0) return false
+                        val loc = ByteArray(20)
+                        raf.seek(locAbs)
+                        raf.readFully(loc)
+                        if (readU32LE(loc, 0) != ZIP64_LOCATOR_SIG_LONG) return false
+                        val eocd64Old = readU64LE(loc, 8)
+                        val eocd64New = eocd64Old + delta
+                        val hdr = ByteArray(56)
+                        raf.seek(eocd64New)
+                        raf.readFully(hdr)
+                        if (readU32LE(hdr, 0) != ZIP64_EOCD_SIG_LONG) return false
+                        val cd64 = readU64LE(hdr, 48)
+                        if (cd64 != expectedOldCd) return false
+                        val newCd = cd64 + delta
+                        val b8 = ByteArray(8) { idx -> ((newCd ushr (8 * idx)) and 0xFF).toByte() }
+                        raf.seek(eocd64New + 48)
+                        raf.write(b8)
+                        val lb8 = ByteArray(8) { idx -> (eocd64New ushr (8 * idx) and 0xFF).toByte() }
+                        raf.seek(locAbs + 8)
+                        raf.write(lb8)
+                    }
+                }
+                return true
+            }
+            false
+        } catch (t: Throwable) {
+            false
         }
     }
 

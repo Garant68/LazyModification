@@ -1,0 +1,38 @@
+CLASS Llazy/sign/KillerApplication; super=Landroid/app/Application;
+== METHOD <clinit> params=[] ret=V
+   registers=0
+   [0] invoke-static Llazy/sign/KillerApplication;->install()V
+   [1] return-void
+== METHOD <init> params=[] ret=V
+   registers=1
+   [0] invoke-direct Landroid/app/Application;-><init>()V
+   [1] return-void
+== METHOD clearMap params=[Ljava/lang/reflect/Field;] ret=V
+   registers=2
+   [0] const/4 lit=0 a=0
+   [1] invoke-virtual Ljava/lang/reflect/Field;->get(Ljava/lang/Object;)Ljava/lang/Object;
+   [2] move-result-object a=1
+   [3] instance-of Ljava/util/Map; a=0 b=1
+   [4] if-eqz a=0 off=7
+   [5] check-cast Ljava/util/Map; a=1
+   [6] invoke-interface Ljava/util/Map;->clear()V
+   [7] return-void
+== METHOD findField params=[Ljava/lang/Class;, Ljava/lang/String;] ret=Ljava/lang/reflect/Field;
+   registers=4
+   [0] if-eqz a=2 off=20
+   [1] const-class Ljava/lang/Object; a=0
+   [2] if-eq a=2 b=0 off=16
+   [3] invoke-virtual Ljava/lang/Class;->getDeclaredField(Ljava/lang/String;)Ljava/lang/reflect/Field;
+   [4] move-result-object a=0
+   [5] const/4 lit=1 a=1
+   [6] invoke-virtual Ljava/lang/reflect/Field;->setAccessible(Z)V
+   [7] return-object a=0
+   [8] invoke-virtual Ljava/lang/Class;->getSuperclass()Ljava/lang/Class;
+   [9] move-result-object a=2
+   [10] goto off=-19
+   [11] new-instance Ljava/lang/NoSuchFieldException; a=2
+   [12] invoke-direct Ljava/lang/NoSuchFieldException;-><init>(Ljava/lang/String;)V
+   [13] throw a=2
+== METHOD install params=[] ret=V
+   registers=0
+   [0] return-void

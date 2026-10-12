@@ -1,0 +1,11 @@
+Llazy/sign/KillerApplication$CreatorWrapper;
+Llazy/sign/KillerApplication;
+Lorg/lsposed/hiddenapibypass/Helper$AccessibleObject;
+Lorg/lsposed/hiddenapibypass/Helper$Class;
+Lorg/lsposed/hiddenapibypass/Helper$Executable;
+Lorg/lsposed/hiddenapibypass/Helper$HandleInfo;
+Lorg/lsposed/hiddenapibypass/Helper$InvokeStub;
+Lorg/lsposed/hiddenapibypass/Helper$MethodHandle;
+Lorg/lsposed/hiddenapibypass/Helper$MethodHandleImpl;
+Lorg/lsposed/hiddenapibypass/Helper$NeverCall;
+Lorg/lsposed/hiddenapibypass/HiddenApiBypass;

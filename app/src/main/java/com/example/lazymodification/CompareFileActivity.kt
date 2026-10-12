@@ -6,6 +6,7 @@ import android.text.Spanned
 import android.text.style.BackgroundColorSpan
 import android.text.style.ForegroundColorSpan
 import android.widget.TextView
+import android.view.WindowManager
 import android.widget.HorizontalScrollView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.widget.NestedScrollView
@@ -30,6 +31,9 @@ class CompareFileActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_compare_file)
+
+        // 🔆 Экран не гаснет во время сравнения
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         val apk1 = intent.getStringExtra(EXTRA_APK1)?.let { File(it) }
         val apk2 = intent.getStringExtra(EXTRA_APK2)?.let { File(it) }

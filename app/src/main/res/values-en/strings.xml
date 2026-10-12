@@ -104,7 +104,7 @@
     <string name="status_reading_locales">⏳ Reading languages...</string>
     <string name="done">✅ Done!</string>
     <string name="icon_selected">✅ Icon selected. You can save now.</string>
-    <string name="signed_preserved_signinfo">✅ Original signature preserved</string>
+    <string name="signed_preserved_signinfo">✅ Original signature data saved</string>
     <string name="signed">✅ Signed</string>
     <string name="err_keystore_not_selected">❌ Keystore not selected</string>
     <string name="oom_apk_too_large">❌ OutOfMemoryError: APK too large to process</string>
@@ -208,7 +208,7 @@
     <string name="status_removing_dpi">📱 Removing DPI graphics...</string>
     <string name="status_signing_apk">🔐 Signing APK...</string>
     <string name="status_signing">🔐 Signing...</string>
-    <string name="original_signature_preserved">🔑 Original signature preserved</string>
+    <string name="original_signature_preserved">🔑 Original signature data saved</string>
     <string name="saving_original_signature">🔑 Saving original signature</string>
     <string name="saving_original_signature_progress">🔑 Saving original signature...</string>
     <string name="temp_files_removed">🗑️ Temporary files removed</string>
@@ -415,4 +415,58 @@
     <string name="sig_err_years">❌ Validity: enter a number from 1 to 100</string>
     <string name="sig_field_type">Keystore type</string>
     <string name="sig_type_desc">PKCS12 is the modern format (recommended). JKS is the legacy Java format (for older tools).</string>
-</resources>
+    <string name="convert_nosign_warning_title">⚠️ Signature</string>
+    <string name="convert_nosign_warning">The original signature cannot be preserved when converting APKS/XAPK: modern files are signed with V2/V3 schemes, which stop being valid after the splits are merged.\n\nThe output will have NO signature — tools (e.g. “Remove signature verification” in MT Manager) will not accept it.\n\nIt is recommended to sign the file with your own key.</string>
+    <string name="convert_nosign_sign_button">Sign with my key</string>
+    <string name="convert_nosign_continue">Continue without signature</string>
+    <string name="original_signature_not_saved">⚠️ The original signature was not preserved — the source has no V1 signature. The file is unsigned: sign it with your own key before further processing.</string>
+    <string name="log_signature_kill_start">🛡️ Removing signature verification: engine injection...</string>
+    <string name="log_signature_kill_ok">🛡️ Signature verification disabled (engine injected)</string>
+    <string name="log_signature_kill_fail">❌ Signature removal failed: %1$s</string>
+    <string name="tools_kill_section">🛡️ Signature verification</string>
+    <string name="tools_kill_desc">Injects an engine that disables signature checks (result-compatible with MT Manager). Pick an APK that carries the original signature — the app will launch even with a changed signature.</string>
+    <string name="tools_kill_button">Remove signature verification</string>
+    <string name="tools_kill_note">ℹ️ Requires a file with the original signature (original app or built with preserved signature). After processing, sign the APK as usual.</string>
+    <string name="allow_screenshots">Allow screenshots</string>
+    <string name="tools_dex_editor">Dex Editor</string>
+    <string name="dex_editor_title">DEX editor</string>
+    <string name="dex_editor_search_hint">Search class…</string>
+    <string name="dex_editor_loading">Reading dex…</string>
+    <string name="dex_editor_classes_found">Classes: %1$d</string>
+    <string name="dex_editor_no_methods">No stubbable methods in this class</string>
+    <string name="dex_editor_stub_title">Stub this method with?</string>
+    <string name="dex_editor_warn">The stub disables the method entirely. Be careful with important methods — the app may break.</string>
+    <string name="dex_editor_confirm">Stub %1$s → %2$s?</string>
+    <string name="dex_editor_added">Added: %1$s → %2$s (queued: %3$d)</string>
+    <string name="dex_editor_already">This method is already queued</string>
+    <string name="dex_editor_apply">Apply (%1$d)</string>
+    <string name="dex_editor_clear">Clear queue</string>
+    <string name="dex_editor_queue_hint">Queued edits: %1$d</string>
+    <string name="stub_log_result">✅ Methods stubbed: %1$d (not found: %2$d)</string>    <string name="dex_editor_mode_class">Classes</string>
+    <string name="dex_editor_mode_method">Methods</string>
+    <string name="dex_editor_mode_string">Strings</string>
+    <string name="dex_editor_search_method_hint">Search method…</string>
+    <string name="dex_editor_search_string_hint">Search string in code…</string>
+    <string name="dex_editor_indexing">Indexing methods…</string>
+    <string name="dex_editor_searching">Searching…</string>
+    <string name="dex_editor_searching_progress">Searching… (%1$d/%2$d)</string>
+    <string name="dex_editor_found">Found: %1$d</string>
+    <string name="dex_editor_not_found">Nothing found</string>    <string name="dex_editor_no_pkg">(no package)</string>
+    <string name="code_title">Method code</string>
+    <string name="code_edit_title">Edit instruction</string>
+    <string name="code_edit_warn">You can replace it with any instruction of the same size (including a different opcode): registers, values, references. The size cannot change.</string>
+    <string name="code_edits_n">edits: %1$d</string>
+    <string name="dex_editor_replace_added">Code edits added: %1$d</string>
+    <string name="replace_log_result">✅ Code edits: %1$d (of %2$d)</string>
+    <string name="code_not_found">Method not found</string>    <string name="code_menu_title">Instruction</string>
+    <string name="code_menu_goto">Go to method</string>
+    <string name="code_copy_line">Copy line</string>
+    <string name="code_copy_all">Copy whole method</string>
+    <string name="copy_done">Copied</string>
+    <string name="code_clear_btn">Clear method</string>
+    <string name="code_clear_title">Clear method?</string>
+    <string name="code_clear_warn">The method code will be replaced with a return of the selected value. Be careful with important methods.</string>
+    <string name="code_clear_done">Method will be cleared: %1$s</string>
+    <string name="code_clear_state">clearing: %1$s</string>
+    <string name="code_clear_cancelled">Method clearing cancelled</string>    <string name="search_history_title">Saved queries</string>
+    <string name="search_history_empty">No saved queries</string></resources>
