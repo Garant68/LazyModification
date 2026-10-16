@@ -28,6 +28,7 @@ class FileBrowserActivity : AppCompatActivity() {
         const val MODE_IMAGE = "image"
         const val PREF_SORT = "sort_prefs"
         const val PREF_SORT_KEY = "sort_mode"
+        const val PREF_LAST_DIR_KEY = "last_dir"
         const val SORT_NAME = "name"
         const val SORT_DATE = "date"
         const val SORT_SIZE = "size"
@@ -137,7 +138,10 @@ class FileBrowserActivity : AppCompatActivity() {
     }
 
     private fun initBrowser() {
-        currentDir = Environment.getExternalStorageDirectory()
+        val root = Environment.getExternalStorageDirectory()
+        val saved = loadLastDir()
+        val savedDir = if (saved != null) File(saved) else null
+        currentDir = if (savedDir != null && savedDir.isDirectory && savedDir.canRead()) savedDir else root
         loadFiles()
         listView.setOnItemClickListener { _, _, position, _ ->
             val file = currentFiles.getOrNull(position) ?: return@setOnItemClickListener
@@ -189,6 +193,7 @@ class FileBrowserActivity : AppCompatActivity() {
             fileList.add(getString(R.string.no_files_access))
             currentFiles.add(null)
         }
+        if (files != null) saveLastDir(currentDir)
 
         val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, fileList)
         listView.adapter = adapter
@@ -208,5 +213,18 @@ class FileBrowserActivity : AppCompatActivity() {
     private fun loadSortMode(): String {
         return getSharedPreferences(PREF_SORT, MODE_PRIVATE)
             .getString(PREF_SORT_KEY, SORT_NAME) ?: SORT_NAME
+    }
+
+    private fun loadLastDir(): String? {
+        val sp = getSharedPreferences(PREF_SORT, MODE_PRIVATE)
+        return sp.getString(PREF_LAST_DIR_KEY + "_" + fileMode, null)
+            ?: sp.getString(PREF_LAST_DIR_KEY, null)
+    }
+
+    private fun saveLastDir(dir: File) {
+        getSharedPreferences(PREF_SORT, MODE_PRIVATE).edit()
+            .putString(PREF_LAST_DIR_KEY + "_" + fileMode, dir.absolutePath)
+            .putString(PREF_LAST_DIR_KEY, dir.absolutePath)
+            .apply()
     }
 }

@@ -145,6 +145,7 @@ class TranslateAppActivity : AppCompatActivity() {
         llPreview = findViewById(R.id.llPreview)
         btnApply = findViewById(R.id.btnApply)
         scrollMain = findViewById(R.id.scrollMain)
+        findViewById<com.example.lazymodification.utils.DragScrollThumb>(R.id.translateScrollThumb).bind(scrollMain)
 
         cache = TranslationCache(this)
 

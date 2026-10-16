@@ -12,6 +12,7 @@ import android.os.Environment
 import android.provider.Settings
 import android.view.View
 import android.view.WindowManager
+import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
@@ -33,7 +34,12 @@ class LogActivity : AppCompatActivity() {
 
     private lateinit var tvLog: TextView
     private lateinit var scrollView: ScrollView
+    private var autoFollowLog = true
     private lateinit var progressBar: ProgressBar
+    private lateinit var stageBox: LinearLayout
+    private lateinit var tvStage: TextView
+    private lateinit var tvStageDetail: TextView
+    private lateinit var tvStagePercent: TextView
     private lateinit var btnClose: MaterialButton
     private lateinit var btnSave: MaterialButton
     private lateinit var btnInstall: MaterialButton  // ✅ НОВАЯ КНОПКА
@@ -43,6 +49,7 @@ class LogActivity : AppCompatActivity() {
 
     private var sourceApkPath: String? = null
     private var hasError = false
+    private var lastShownProgress = -1
 
     // ✅ НОВОЕ: данные для установки
     private var patchedApkPath: String? = null
@@ -123,7 +130,7 @@ class LogActivity : AppCompatActivity() {
 
             runOnUiThread {
                 tvLog.text = android.text.Html.fromHtml(logBuffer.toString(), android.text.Html.FROM_HTML_MODE_LEGACY)
-                scrollView.fullScroll(ScrollView.FOCUS_DOWN)
+                if (autoFollowLog) scrollView.fullScroll(ScrollView.FOCUS_DOWN)
             }
         }
     }
@@ -131,17 +138,39 @@ class LogActivity : AppCompatActivity() {
     private val progressReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val progress = intent?.getIntExtra("PROGRESS_VALUE", 0) ?: return
+            val stCount = intent?.getIntExtra("STAGE_COUNT", -1) ?: -1
+            val stText = intent?.getStringExtra("STAGE_TEXT") ?: ""
+            val stDetail = intent?.getStringExtra("STAGE_DETAIL") ?: ""
             runOnUiThread {
-                progressBar.progress = progress
-                if (progress >= 100 && !hasError) {
-                    progressBar.progressTintList = android.content.res.ColorStateList.valueOf(
-                        android.graphics.Color.parseColor("#00AA00")
-                    )
-                    btnClose.visibility = View.VISIBLE
-                    btnSave.visibility = View.VISIBLE
-                    // ✅ Показываем кнопку getString(R.string.install) если есть APK
-                    if (patchedApkPath != null) {
-                        btnInstall.visibility = View.VISIBLE
+                // Новый прогон начинается заново — сбрасываем защиту от отката
+                if (progress == 0 && stCount > 0) lastShownProgress = -1
+                if (stCount == 0) lastShownProgress = 0
+                if (progress >= lastShownProgress) {
+                    lastShownProgress = maxOf(lastShownProgress, progress)
+                    progressBar.progress = progress
+                    tvStagePercent.text = "$progress%"
+                    if (stCount > 0) {
+                        stageBox.visibility = View.VISIBLE
+                        tvStage.text = stText
+                        if (stDetail.isNotEmpty()) {
+                            tvStageDetail.visibility = View.VISIBLE
+                            tvStageDetail.text = stDetail
+                        } else {
+                            tvStageDetail.visibility = View.GONE
+                        }
+                    } else if (stCount == 0) {
+                        stageBox.visibility = View.GONE
+                    }
+                    if (progress >= 100 && !hasError) {
+                        progressBar.progressTintList = android.content.res.ColorStateList.valueOf(
+                            android.graphics.Color.parseColor("#00AA00")
+                        )
+                        btnClose.visibility = View.VISIBLE
+                        btnSave.visibility = View.VISIBLE
+                        // ✅ Показываем кнопку getString(R.string.install) если есть APK
+                        if (patchedApkPath != null) {
+                            btnInstall.visibility = View.VISIBLE
+                        }
                     }
                 }
             }
@@ -157,8 +186,20 @@ class LogActivity : AppCompatActivity() {
                 patchedApkPath = apkPath
                 patchedPackageName = pkgName
                 runOnUiThread {
-                    if (!hasError && progressBar.progress >= 100) {
-                        btnInstall.visibility = View.VISIBLE
+                    // ✅ Патч завершён успешно — доводим экран до финального состояния
+                    if (!hasError) {
+                        lastShownProgress = 100
+                        progressBar.progress = 100
+                        tvStagePercent.text = "100%"
+                        stageBox.visibility = View.GONE
+                        progressBar.progressTintList = android.content.res.ColorStateList.valueOf(
+                            android.graphics.Color.parseColor("#00AA00")
+                        )
+                        btnClose.visibility = View.VISIBLE
+                        btnSave.visibility = View.VISIBLE
+                        if (patchedApkPath != null) {
+                            btnInstall.visibility = View.VISIBLE
+                        }
                     }
                 }
             }
@@ -179,7 +220,18 @@ class LogActivity : AppCompatActivity() {
 
         tvLog = findViewById(R.id.tvLog)
         scrollView = findViewById(R.id.scrollView)
+        val logThumb = findViewById<com.example.lazymodification.utils.DragScrollThumb>(R.id.logScrollThumb)
+        logThumb.bind(scrollView)
+        logThumb.onUserDrag = { autoFollowLog = false }
+        scrollView.viewTreeObserver.addOnScrollChangedListener {
+            val c = scrollView.getChildAt(0)?.height ?: 0
+            if (scrollView.height > 0 && c - scrollView.height - scrollView.scrollY <= 8) autoFollowLog = true
+        }
         progressBar = findViewById(R.id.progressBar)
+        stageBox = findViewById(R.id.stageBox)
+        tvStage = findViewById(R.id.tvStage)
+        tvStageDetail = findViewById(R.id.tvStageDetail)
+        tvStagePercent = findViewById(R.id.tvStagePercent)
         btnClose = findViewById(R.id.btnClose)
         btnSave = findViewById(R.id.btnSave)
         btnInstall = findViewById(R.id.btnInstall)  // ✅ Инициализация
@@ -196,6 +248,9 @@ class LogActivity : AppCompatActivity() {
             plainLogBuffer.clear()
             progressBar.progress = 0
             progressBar.progressTintList = null
+            tvStagePercent.text = "0%"
+            stageBox.visibility = View.GONE
+            lastShownProgress = -1
             hasError = false
             patchedApkPath = null
             patchedPackageName = null
@@ -228,6 +283,13 @@ class LogActivity : AppCompatActivity() {
             })
         } catch (e: Exception) {
             android.util.Log.e("LogActivity", "Flush failed: ${e.message}")
+        }
+        try {
+            startService(Intent(this, PatchService::class.java).apply {
+                action = PatchService.ACTION_QUERY_STATE
+            })
+        } catch (e: Exception) {
+            android.util.Log.e("LogActivity", "Query state failed: ${e.message}")
         }
     }
 

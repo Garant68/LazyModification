@@ -4,6 +4,10 @@ plugins {
 }
 
 android {
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
     namespace = "com.example.lazymodification" // ⚠️ См. примечание ниже про пакет
     compileSdk = 34
 
@@ -11,8 +15,8 @@ android {
         applicationId = "com.example.lazymodification"
         minSdk = 21
         targetSdk = 35
-        versionCode = 124
-        versionName = "1.24"
+        versionCode = 125
+        versionName = "1.25"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

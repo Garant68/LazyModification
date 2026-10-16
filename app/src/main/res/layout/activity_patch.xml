@@ -45,6 +45,18 @@
             app:iconPadding="12dp"/>
 
                 <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnRemoveSignatureCheck"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:padding="16dp"
+            android:text="@string/tools_kill_button"
+            android:textSize="16sp"
+            app:icon="@drawable/ic_tools"
+            app:iconGravity="textStart"
+            app:iconPadding="12dp"/>
+
+                <com.google.android.material.button.MaterialButton
             android:id="@+id/checkBoxGooglePlay"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

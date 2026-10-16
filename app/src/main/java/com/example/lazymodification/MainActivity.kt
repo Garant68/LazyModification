@@ -23,7 +23,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnEdit: MaterialButton
     private lateinit var btnInterface: MaterialButton
     private lateinit var btnTools: MaterialButton
-    private lateinit var btnCompare: MaterialButton
     private lateinit var btnPatch: MaterialButton
     private lateinit var btnExit: MaterialButton
 
@@ -133,7 +132,6 @@ class MainActivity : AppCompatActivity() {
         btnEdit = findViewById(R.id.btnEdit)
         btnInterface = findViewById(R.id.btnInterface)
         btnTools = findViewById(R.id.btnTools)
-        btnCompare = findViewById(R.id.btnCompare)
         btnPatch = findViewById(R.id.btnPatch)
         btnExit = findViewById(R.id.btnExit)
 
@@ -142,7 +140,6 @@ class MainActivity : AppCompatActivity() {
         setupEditButton()
         setupInterfaceButton()
         setupToolsButton()
-        setupCompareButton()
         setupPatchButton()
         setupExitButton()
     }
@@ -260,47 +257,6 @@ class MainActivity : AppCompatActivity() {
     private fun setupToolsButton() {
         btnTools.setOnClickListener {
             startActivity(Intent(this, ToolsActivity::class.java))
-        }
-    }
-
-    private fun setupCompareButton() {
-        btnCompare.setOnClickListener {
-            val axmlCheck = CheckBox(this).apply {
-                text = getString(R.string.compare_axml)
-                isChecked = false
-            }
-            val dexCheck = CheckBox(this).apply {
-                text = getString(R.string.compare_dex)
-                isChecked = true
-            }
-            axmlCheck.setOnCheckedChangeListener { _, checked -> if (checked) dexCheck.isChecked = false }
-            dexCheck.setOnCheckedChangeListener { _, checked -> if (checked) axmlCheck.isChecked = false }
-            val pad = (24 * resources.displayMetrics.density).toInt()
-            val container = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(pad, pad / 2, pad, 0)
-                addView(axmlCheck)
-                addView(dexCheck)
-            }
-            AlertDialog.Builder(this)
-                .setTitle(R.string.compare_apk)
-                .setView(container)
-                .setPositiveButton(android.R.string.ok) { _, _ ->
-                    val mode = when {
-                        axmlCheck.isChecked -> "axml"
-                        dexCheck.isChecked -> "dex"
-                        else -> null
-                    }
-                    if (mode == null) {
-                        Toast.makeText(this, getString(R.string.select_option), Toast.LENGTH_SHORT).show()
-                        return@setPositiveButton
-                    }
-                    startActivity(Intent(this, CompareApkActivity::class.java).apply {
-                        putExtra(CompareApkActivity.EXTRA_MODE, mode)
-                    })
-                }
-                .setNegativeButton(android.R.string.cancel, null)
-                .show()
         }
     }
 

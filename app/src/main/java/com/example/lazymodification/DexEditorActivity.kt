@@ -14,6 +14,7 @@ import android.text.TextWatcher
 import android.text.Spannable
 import android.text.SpannableString
 import android.text.style.BackgroundColorSpan
+import android.text.style.ForegroundColorSpan
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
@@ -757,11 +758,15 @@ class DexEditorActivity : AppCompatActivity() {
         val end = minOf(to, s.length)
         if (from >= end || end - from < q.length) return s
         val sp = SpannableString(s)
+        val hlDark = ThemeHelper.isDark(this)
+        val hlBg = if (hlDark) 0xFF665500.toInt() else 0xFFFFF176.toInt()
+        val hlFg = if (hlDark) 0xFFFFF176.toInt() else 0xFF000000.toInt()
         var i = from
         val last = end - q.length
         while (i <= last) {
             if (s.regionMatches(i, q, 0, q.length, true)) {
-                sp.setSpan(BackgroundColorSpan(0xFFFFF176.toInt()), i, i + q.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                sp.setSpan(BackgroundColorSpan(hlBg), i, i + q.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                sp.setSpan(ForegroundColorSpan(hlFg), i, i + q.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
                 i += q.length
             } else {
                 i++

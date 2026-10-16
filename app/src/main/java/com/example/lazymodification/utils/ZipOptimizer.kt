@@ -7,6 +7,7 @@ import java.io.DataOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.InputStream
 import java.io.OutputStream
 import java.util.zip.CRC32
 import java.util.zip.Deflater
@@ -21,15 +22,18 @@ import java.util.zip.ZipInputStream
  */
 object ZipOptimizer {
 
-    fun recompressUltra(input: File, output: File): Long {
+    fun recompressUltra(input: File, output: File, onProgress: ((Long, Long) -> Unit)? = null): Long {
         val before = input.length()
         val entries = ArrayList<EntryMeta>()
         val countingOut = CountingOutputStream(BufferedOutputStream(FileOutputStream(output)))
         val dos = DataOutputStream(countingOut)
+        val cin = CountingInputStream(FileInputStream(input))
+        val totalBytes = before.coerceAtLeast(1L)
 
-        ZipInputStream(BufferedInputStream(FileInputStream(input))).use { zis ->
+        ZipInputStream(BufferedInputStream(cin)).use { zis ->
             var entry: ZipEntry? = zis.nextEntry
             while (entry != null) {
+                onProgress?.invoke(cin.count, totalBytes)
                 val name = entry.name
                 val raw = zis.readBytes()
                 val crc = crc32(raw)
@@ -57,6 +61,7 @@ object ZipOptimizer {
             }
         }
 
+        onProgress?.invoke(totalBytes, totalBytes)
         val cdOffset = countingOut.count
         for (m in entries) writeCentralHeader(dos, m)
         val cdSize = countingOut.count - cdOffset
@@ -106,6 +111,23 @@ object ZipOptimizer {
         val compressedSize: Long, val uncompressedSize: Long,
         val localOffset: Long, val dosTime: Long
     )
+
+    private class CountingInputStream(private val inp: InputStream) : InputStream() {
+        var count: Long = 0L
+            private set
+        override fun read(): Int {
+            val r = inp.read()
+            if (r >= 0) count++
+            return r
+        }
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            val r = inp.read(b, off, len)
+            if (r > 0) count += r
+            return r
+        }
+        override fun available(): Int = inp.available()
+        override fun close() { inp.close() }
+    }
 
     private class CountingOutputStream(private val out: OutputStream) : OutputStream() {
         var count: Long = 0L

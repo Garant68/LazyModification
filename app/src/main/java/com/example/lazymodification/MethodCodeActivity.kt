@@ -523,8 +523,9 @@ class MethodCodeActivity : AppCompatActivity() {
                 }
                 2 -> {
                     tv.textSize = 13f
-                    tv.setTextColor(MaterialColors.getColor(tv, com.google.android.material.R.attr.colorOnSurface))
-                    tv.setBackgroundColor(0xFFFFF176.toInt())
+                    val hlDark = ThemeHelper.isDark(this@MethodCodeActivity)
+                    tv.setTextColor(if (hlDark) 0xFFFFF176.toInt() else 0xFF000000.toInt())
+                    tv.setBackgroundColor(if (hlDark) 0xFF665500.toInt() else 0xFFFFF176.toInt())
                     tv.setPadding(dp(8), dp(3), dp(8), dp(3))
                 }
                 else -> {

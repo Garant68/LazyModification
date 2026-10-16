@@ -1,21 +1,24 @@
 package com.example.lazymodification.utils
 
 import java.io.BufferedOutputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.RandomAccessFile
 import java.util.zip.CRC32
+import java.util.zip.Deflater
 
 /**
  * ⚡ Быстрая однопроходная перепаковка APK (подход как у MT Manager):
  *  - неизменённые записи копируются СЫРЫМИ байтами (без распаковки и пере-сжатия);
- *  - заменяемые/новые записи (dex и т.п.) пишутся из файлов как STORED;
+ *  - заменяемые записи сохраняют упаковку оригинала: сжатый dex снова пишется
+ *    сжатым (DEFLATE), несжатый — несжатым (иначе после патча файл вырастал
+ *    на десятки МБ); новые записи — STORED, новые dex — DEFLATE;
  *  - лишние записи (kotlin-метаданные и пр.) отбрасываются;
- *  - STORED-записи выравниваются: lib/(.so) — 4096 байт (page align, как
- *    zipalign -p 4), остальные — 4 байта. Выравнивание реализовано «зазорами»
- *    между записями, что для читателей ZIP (и для платформы Android) равнозначно
- *    выравниванию zipalign.
+ *  - STORED-записи выравниваются: lib/(.so) — 16384 байт (page align),
+ *    остальные — 4 байта. Выравнивание реализовано «зазорами» между записями,
+ *    что для читателей ZIP (и для платформы Android) равнозначно zipalign.
  *
  * Только java.io/java.util.zip — класс юнит-тестируется на JVM.
  */
@@ -54,7 +57,8 @@ object FastZipRepack {
         inputApk: File,
         replacements: Map<String, File>,
         outputApk: File,
-        applyClean: Boolean
+        applyClean: Boolean,
+        onProgress: ((Int, Int) -> Unit)? = null
     ): Counts {
         if (outputApk.exists()) outputApk.delete()
         var kept = 0
@@ -114,6 +118,8 @@ object FastZipRepack {
                 )
             }
             src.sortBy { it.localOffset }
+            val totalWork = src.size + replacements.size
+            var processed = 0
 
             val out = BufferedOutputStream(FileOutputStream(outputApk), 1 shl 16)
             try {
@@ -141,34 +147,40 @@ object FastZipRepack {
                 }
                 fun alignFor(name: String): Long =
                     if (name.startsWith("lib/") && name.endsWith(".so")) 16384L else 4L
-                fun writeFresh(name: String, data: ByteArray, time: Int, date: Int, extAttr: Int) {
+                fun writeFresh(name: String, data: ByteArray, time: Int, date: Int, extAttr: Int, deflate: Boolean) {
                     val nameBytes = name.toByteArray(Charsets.UTF_8)
+                    val packed = if (deflate) deflateRaw(data) else null
+                    val stored = packed == null || packed.size >= data.size
+                    val method = if (stored) 0 else 8
+                    val payload = if (stored) data else packed!!
                     val alignPad = buildAlignPad(pos + 30L + nameBytes.size, 4L)
                     val off = pos
                     val crc = CRC32()
                     crc.update(data)
                     val h = ByteArray(30)
                     putU32(h, 0, LFH_SIG)
-                    putU16(h, 4, 20); putU16(h, 6, 0); putU16(h, 8, 0)
+                    putU16(h, 4, 20); putU16(h, 6, 0); putU16(h, 8, method)
                     putU16(h, 10, time); putU16(h, 12, date)
                     putU32(h, 14, crc.value)
-                    putU32(h, 18, data.size.toLong()); putU32(h, 22, data.size.toLong())
+                    putU32(h, 18, payload.size.toLong()); putU32(h, 22, data.size.toLong())
                     putU16(h, 26, nameBytes.size); putU16(h, 28, if (alignPad != null) alignPad.size else 0)
                     write(h); write(nameBytes)
                     if (alignPad != null) write(alignPad)
-                    write(data)
+                    write(payload)
                     cdRecords.add(
-                        buildCenterRecord(nameBytes, 0, 0, crc.value, data.size.toLong(), data.size.toLong(), off, time, date, extAttr)
+                        buildCenterRecord(nameBytes, 0, method, crc.value, payload.size.toLong(), data.size.toLong(), off, time, date, extAttr)
                     )
                 }
 
                 val usedNames = HashSet<String>()
                 for (e in src) {
+                    processed++
+                    onProgress?.invoke(processed, totalWork)
                     usedNames.add(e.name)
                     if (applyClean && shouldRemove(e.name)) { removed++; continue }
                     val repl = replacements[e.name]
                     if (repl != null) {
-                        writeFresh(e.name, repl.readBytes(), e.time, e.date, e.extAttr)
+                        writeFresh(e.name, repl.readBytes(), e.time, e.date, e.extAttr, e.method == 8)
                         kept++
                         continue
                     }
@@ -218,9 +230,11 @@ object FastZipRepack {
                 }
                 // --- новые записи (например, classes6.dex) ---
                 for ((name, f) in replacements) {
+                    processed++
+                    onProgress?.invoke(processed, totalWork)
                     if (usedNames.contains(name)) continue
                     if (applyClean && shouldRemove(name)) { removed++; continue }
-                    writeFresh(name, f.readBytes(), 0x5000, 0x5A21, 0)
+                    writeFresh(name, f.readBytes(), 0x5000, 0x5A21, 0, name.endsWith(".dex"))
                     kept++
                 }
                 // --- центральный каталог ---
@@ -241,6 +255,25 @@ object FastZipRepack {
             }
         }
         return Counts(kept, removed)
+    }
+
+    /** RAW-DEFLATE уровня 6 (для ZIP): ~0.37 на dex, при этом втрое быстрее level 9. */
+    private fun deflateRaw(data: ByteArray): ByteArray? {
+        if (data.size < 64) return null
+        val d = Deflater(6, true) // level 6, nowrap (raw DEFLATE, как нужно для ZIP)
+        return try {
+            d.setInput(data)
+            d.finish()
+            val out = ByteArrayOutputStream((data.size / 3).coerceAtLeast(64))
+            val tmp = ByteArray(65536)
+            while (!d.finished()) {
+                val n = d.deflate(tmp)
+                if (n > 0) out.write(tmp, 0, n)
+            }
+            out.toByteArray()
+        } finally {
+            d.end()
+        }
     }
 
     private fun buildCenterRecord(

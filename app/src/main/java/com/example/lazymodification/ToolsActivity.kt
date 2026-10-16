@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.text.InputType
 import android.view.View
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.RadioButton
@@ -35,48 +36,6 @@ class ToolsActivity : AppCompatActivity() {
 
     private val uiHandler = Handler(Looper.getMainLooper())
 
-    private var killApkPath: String? = null
-    private var killV1 = true
-    private var killV2 = true
-    private var killV3 = true
-    private var pendingKillConfirm: ((SignatureConfig) -> Unit)? = null
-
-    private val keystoreLauncher = registerForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) {
-            val file = SigningUtils.copyKeystoreToCache(this, uri)
-            if (file != null) {
-                SigningUtils.showKeystorePasswordDialog(this, file, killV1, killV2, killV3) { config ->
-                    pendingKillConfirm?.invoke(config)
-                    pendingKillConfirm = null
-                }
-            } else {
-                Toast.makeText(this, getString(R.string.err_keystore_read_failed), Toast.LENGTH_LONG).show()
-                pendingKillConfirm = null
-            }
-        } else {
-            Toast.makeText(this, getString(R.string.err_keystore_not_selected), Toast.LENGTH_SHORT).show()
-            pendingKillConfirm = null
-        }
-    }
-
-    private val pickApkForKillLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == RESULT_OK) {
-            val path = result.data?.getStringExtra(FileBrowserActivity.EXTRA_SELECTED_PATH)
-            if (path != null) {
-                val file = File(path)
-                if (file.exists()) {
-                    startKillFlow(path)
-                } else {
-                    Toast.makeText(this, getString(R.string.file_not_found), Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    }
-
     private val pickApkForDexEditorLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -95,56 +54,6 @@ class ToolsActivity : AppCompatActivity() {
         }
     }
 
-    private fun startKillFlow(path: String) {
-        killApkPath = path
-        pendingKillConfirm = { config -> startKillPatching(config) }
-        SigningUtils.resolveSigningConfig(
-            activity = this,
-            onCustomSelected = { v1, v2, v3 ->
-                killV1 = v1; killV2 = v2; killV3 = v3
-                keystoreLauncher.launch(arrayOf("*/*"))
-            },
-            onConfirm = { config -> startKillPatching(config) }
-        )
-    }
-
-    private fun startKillPatching(config: SignatureConfig) {
-        val path = killApkPath ?: return
-        val serviceIntent = Intent(this, PatchService::class.java).apply {
-            putExtra(PatchService.EXTRA_APK_PATH, path)
-            putExtra(PatchService.EXTRA_PATCH_GOOGLE_PLAY, false)
-            putExtra(PatchService.EXTRA_PATCH_REMOVE_ADS, false)
-            putExtra(PatchService.EXTRA_PATCH_REMOVE_ANALYTICS, false)
-            putExtra(PatchService.EXTRA_PATCH_REMOVE_GP_SERVICES, false)
-            putExtra(PatchService.EXTRA_PATCH_REMOVE_VPN, false)
-            putExtra(PatchService.EXTRA_PATCH_REMOVE_INSTALLER_CHECK, false)
-            putExtra(PatchService.EXTRA_PATCH_REMOVE_UPDATE, false)
-            putExtra(PatchService.EXTRA_PATCH_REMOVE_SIGNATURE, true)
-            putExtra(PatchService.EXTRA_TOOLS_KILL_ONLY, true)
-            putExtra(PatchService.EXTRA_PATCH_REMOVE_LOCALES, false)
-            putExtra(PatchService.EXTRA_PATCH_REMOVE_DPI, false)
-            putExtra(PatchService.EXTRA_PATCH_REMOVE_LIBS, false)
-            putExtra(PatchService.EXTRA_PATCH_OPTIMIZE, false)
-            putExtra(PatchService.EXTRA_NO_SIGN, config.noSign)
-            putExtra(PatchService.EXTRA_SIGN_V1, config.signV1)
-            putExtra(PatchService.EXTRA_SIGN_V2, config.signV2)
-            putExtra(PatchService.EXTRA_SIGN_V3, config.signV3)
-            putExtra(PatchService.EXTRA_CUSTOM_KEYSTORE_PATH, config.customKeystorePath)
-            putExtra(PatchService.EXTRA_KEYSTORE_PASSWORD, config.keystorePassword)
-            putExtra(PatchService.EXTRA_KEY_ALIAS, config.keyAlias)
-            putExtra(PatchService.EXTRA_KEY_PASSWORD, config.keyPassword)
-            putExtra(PatchService.EXTRA_KEYSTORE_TYPE, config.keystoreType)
-        }
-        try {
-            startForegroundService(serviceIntent)
-            startActivity(Intent(this, LogActivity::class.java).apply {
-                putExtra("SOURCE_APK_PATH", path)
-            })
-        } catch (e: Exception) {
-            Toast.makeText(this, getString(R.string.error_msg_plain, e.message), Toast.LENGTH_LONG).show()
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ThemeHelper.apply(this)
@@ -154,17 +63,57 @@ class ToolsActivity : AppCompatActivity() {
             showCreateSignatureDialog()
         }
 
-        findViewById<MaterialButton>(R.id.btnRemoveSignatureCheck).setOnClickListener {
-            pickApkForKillLauncher.launch(Intent(this, FileBrowserActivity::class.java).apply {
-                putExtra(FileBrowserActivity.EXTRA_FILE_MODE, FileBrowserActivity.MODE_APK)
-            })
-        }
-
         findViewById<MaterialButton>(R.id.btnDexEditor).setOnClickListener {
             pickApkForDexEditorLauncher.launch(Intent(this, FileBrowserActivity::class.java).apply {
                 putExtra(FileBrowserActivity.EXTRA_FILE_MODE, FileBrowserActivity.MODE_APK)
             })
         }
+
+        findViewById<MaterialButton>(R.id.btnCompare).setOnClickListener {
+            showCompareDialog()
+        }
+    }
+
+    // ============================================================
+    // СРАВНЕНИЕ APK (выбор режима: Axml / Dex)
+    // ============================================================
+    private fun showCompareDialog() {
+        val axmlCheck = CheckBox(this).apply {
+            text = getString(R.string.compare_axml)
+            isChecked = false
+        }
+        val dexCheck = CheckBox(this).apply {
+            text = getString(R.string.compare_dex)
+            isChecked = true
+        }
+        axmlCheck.setOnCheckedChangeListener { _, checked -> if (checked) dexCheck.isChecked = false }
+        dexCheck.setOnCheckedChangeListener { _, checked -> if (checked) axmlCheck.isChecked = false }
+        val pad = (24 * resources.displayMetrics.density).toInt()
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(pad, pad / 2, pad, 0)
+            addView(axmlCheck)
+            addView(dexCheck)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.compare_apk)
+            .setView(container)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val mode = when {
+                    axmlCheck.isChecked -> "axml"
+                    dexCheck.isChecked -> "dex"
+                    else -> null
+                }
+                if (mode == null) {
+                    Toast.makeText(this, getString(R.string.select_option), Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                startActivity(Intent(this, CompareApkActivity::class.java).apply {
+                    putExtra(CompareApkActivity.EXTRA_MODE, mode)
+                })
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     // ============================================================

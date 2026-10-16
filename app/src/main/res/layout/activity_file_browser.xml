@@ -8,5 +8,8 @@
     <ListView
         android:id="@+id/lv_files"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:fastScrollEnabled="true"
+        android:fastScrollAlwaysVisible="true"
+        android:fastScrollThumbDrawable="@drawable/scroll_thumb" />
 </LinearLayout>

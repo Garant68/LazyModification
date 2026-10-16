@@ -99,6 +99,7 @@ class CompareFileActivity : AppCompatActivity() {
 
         val svLeft = findViewById<NestedScrollView>(R.id.svCompareLeft)
         val svRight = findViewById<NestedScrollView>(R.id.svCompareRight)
+        findViewById<com.example.lazymodification.utils.DragScrollThumb>(R.id.cmpScrollThumb).bind(svRight)
 
         val firstChanged = diff.lines.indexOfFirst { it.status != DexComparer.LineStatus.SAME }
         if (firstChanged >= 0) {

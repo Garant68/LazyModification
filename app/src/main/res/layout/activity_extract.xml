@@ -39,9 +39,21 @@
         android:gravity="center"
         android:visibility="gone" />
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvApps"
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvApps"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scrollbars="none" />
+
+        <com.example.lazymodification.utils.DragScrollThumb
+            android:id="@+id/extractScrollThumb"
+            android:layout_width="28dp"
+            android:layout_height="match_parent"
+            android:layout_gravity="end" />
+    </FrameLayout>
 
 </LinearLayout>

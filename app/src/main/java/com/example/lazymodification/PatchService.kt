@@ -29,6 +29,8 @@ import com.example.lazymodification.utils.SigningUtils
 import com.example.lazymodification.utils.ZipOptimizer
 import com.reandroid.apk.ApkModule
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
@@ -67,6 +69,7 @@ class PatchService : Service() {
         const val EXTRA_KEYSTORE_TYPE = "keystore_type"
 
         const val ACTION_FLUSH_LOGS = "com.example.lazymodification.FLUSH_LOGS"
+        const val ACTION_QUERY_STATE = "com.example.lazymodification.QUERY_STATE"
         const val CHANNEL_ID = "patch_channel"
         const val NOTIFICATION_ID = 1001
         const val TAG = "PatchService"
@@ -78,6 +81,22 @@ class PatchService : Service() {
     }
 
     private var wakeLock: PowerManager.WakeLock? = null
+
+    // ===== Этапы точного прогресса =====
+    private val stageNames = mutableListOf<String>()
+    private val stageWeights = mutableListOf<Float>()
+    private var stageIdx = -1
+    private var stageBaseW = 0f
+    private var stageTotalW = 1f
+    private var lastOverall = -1
+    private var runActive = false
+    private var completedPath: String? = null
+    private var completedPkg: String? = null
+    private var lastBcP = 0
+    private var lastBcI = 0
+    private var lastBcN = 0
+    private var lastBcName = ""
+    private var lastBcDetail = ""
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -91,6 +110,19 @@ class PatchService : Service() {
             synchronized(logBuffer) { logBuffer.clear() }
             val installCopy = File(cacheDir, "install_target.apk")
             if (installCopy.exists()) installCopy.delete()
+            return START_NOT_STICKY
+        }
+
+        if (intent?.action == ACTION_QUERY_STATE) {
+            val cp = completedPath
+            if (cp != null) {
+                broadcastStage(100, 0, 0, "", "")
+                sendPatchComplete(cp, completedPkg)
+            } else if (runActive && lastBcN > 0) {
+                broadcastStage(lastBcP, lastBcI, lastBcN, lastBcName, lastBcDetail)
+            } else {
+                broadcastStage(0, 0, 0, "", "")
+            }
             return START_NOT_STICKY
         }
 
@@ -229,6 +261,75 @@ class PatchService : Service() {
         )
     }
 
+    private fun addStage(name: String, weight: Float) {
+        stageNames.add(name)
+        stageWeights.add(weight)
+    }
+
+    private fun stageBegin() {
+        stageIdx++
+        val n = stageNames.size
+        val name = stageNames.getOrNull(stageIdx) ?: return
+        sendLog("⏳ ${stageIdx + 1}/$n $name…", "INFO")
+        stageSend(0f, "")
+    }
+
+    private fun stageTick(fraction: Float, detail: String = "") {
+        stageSend(fraction, detail)
+    }
+
+    private fun stageSend(fraction: Float, detail: String) {
+        val n = stageNames.size
+        if (stageIdx < 0 || stageIdx >= n) return
+        val w = stageWeights.getOrElse(stageIdx) { 1f }
+        val done = stageBaseW + w * fraction.coerceIn(0f, 1f)
+        val overall = if (stageTotalW > 0f) (done / stageTotalW * 100f).toInt().coerceIn(0, 100) else 0
+        if (overall > lastOverall) lastOverall = overall
+        broadcastStage(lastOverall, stageIdx + 1, n, stageNames[stageIdx], detail)
+    }
+
+    private fun stageDone(suffix: String = "") {
+        val n = stageNames.size
+        if (stageIdx in 0 until n) {
+            sendLog("✅ ${stageIdx + 1}/$n ${stageNames[stageIdx]}$suffix", "SUCCESS")
+            stageBaseW += stageWeights.getOrElse(stageIdx) { 0f }
+        }
+        val overall = if (stageTotalW > 0f) (stageBaseW / stageTotalW * 100f).toInt().coerceIn(0, 100) else 0
+        if (overall > lastOverall) lastOverall = overall
+        val idxShow = if (stageIdx >= 0) stageIdx + 1 else 0
+        broadcastStage(lastOverall, idxShow, n, stageNames.getOrNull(stageIdx) ?: "", "")
+    }
+
+    private fun stageAbort(p: Int = 0) {
+        broadcastStage(p, 0, 0, "", "")
+    }
+
+    private fun broadcastStage(p: Int, i: Int, n: Int, name: String, detail: String) {
+        val pf = p.coerceIn(0, 100)
+        val header = if (n > 0) "Этап $i из $n — $name" else ""
+        lastBcP = pf
+        lastBcI = i
+        lastBcN = n
+        lastBcName = name
+        lastBcDetail = detail
+        LocalBroadcastManager.getInstance(this).sendBroadcast(
+            Intent("PATCH_PROGRESS").apply {
+                putExtra("PROGRESS_VALUE", pf)
+                putExtra("STAGE_COUNT", n)
+                putExtra("STAGE_TEXT", header)
+                putExtra("STAGE_DETAIL", detail)
+            }
+        )
+        try {
+            val text = when {
+                n > 0 && detail.isNotEmpty() -> "Патчинг: $i/$n · $name — $detail · $pf%"
+                n > 0 -> "Патчинг: $i/$n · $name · $pf%"
+                else -> "Патчинг: $pf%"
+            }
+            getSystemService(NotificationManager::class.java)?.notify(NOTIFICATION_ID, createNotification(text))
+        } catch (_: Throwable) { }
+    }
+
     private fun getPackageNameFromApk(apkFile: File): String? {
         return try {
             val pi = packageManager.getPackageArchiveInfo(apkFile.absolutePath, 0)
@@ -250,6 +351,8 @@ class PatchService : Service() {
             val installCopy = File(cacheDir, "install_target.apk")
             finalApk.copyTo(installCopy, overwrite = true)
             val pkgName = getPackageNameFromApk(installCopy)
+            completedPath = installCopy.absolutePath
+            completedPkg = pkgName
             sendPatchComplete(installCopy.absolutePath, pkgName)
             sendLog(getString(R.string.log_apk_prepared, pkgName ?: getString(R.string.unknown)), "INFO")
         } catch (e: Exception) {
@@ -286,126 +389,175 @@ class PatchService : Service() {
         else "🔐 V1=${signConfig.signV1}, V2=${signConfig.signV2}, V3=${signConfig.signV3}"
         sendLog(getString(R.string.log_signature, signDesc), "INFO")
 
+        // ===== План этапов (точный прогресс) =====
+        val needsDexPatching = patchGooglePlay || patchRemoveAds || patchRemoveAnalytics ||
+                patchRemoveGPServices || patchRemoveVpn || patchRemoveInstallerCheck || patchRemoveUpdate || patchRemoveSignature || patchOptimize || patchAllowScreenshots || stubEdits.isNotEmpty() || codeEdits.isNotEmpty()
+        val hasTail = needsDexPatching || patchRemoveLocales || patchRemoveDpi || patchRemoveLibs
+        stageNames.clear()
+        stageWeights.clear()
+        addStage("Копирование APK", 3f)
+        if (patchRemoveAnalytics) addStage("Патч манифеста", 3f)
+        if (patchRemoveLocales) addStage("Удаление локалей", 3f)
+        if (patchRemoveDpi) addStage("Удаление DPI", 3f)
+        if (patchRemoveLibs) addStage("Удаление библиотек", 3f)
+        if (needsDexPatching) addStage("Обработка dex", 50f)
+        if (needsDexPatching && patchRemoveSignature) addStage("Внедрение движка подписи", 4f)
+        if (needsDexPatching) addStage("Пересборка APK", 12f)
+        if (needsDexPatching && patchOptimize) addStage("Оптимизация (сжатие)", 5f)
+        if (hasTail) addStage("ZipAlign", 2f)
+        if (hasTail) addStage("Подпись", 4f)
+        if (hasTail) addStage("Сохранение результата", 3f)
+        stageTotalW = stageWeights.sum()
+        stageIdx = -1
+        stageBaseW = 0f
+        lastOverall = -1
+        runActive = true
+        completedPath = null
+        completedPkg = null
+
         val workDir = File(cacheDir, "patch_${System.currentTimeMillis()}")
         workDir.mkdirs()
 
         var anyApplied = false
         try {
-            sendLog(getString(R.string.status_copying_apk), "INFO")
+            stageBegin()
             var workingApk = File(workDir, apkFile.name)
-            apkFile.copyTo(workingApk, overwrite = true)
-            sendLog(getString(R.string.log_copied_mb, String.format("%.1f", workingApk.length() / (1024.0 * 1024.0))), "SUCCESS")
-            sendProgress(5)
+            run {
+                val copyTotal = apkFile.length()
+                var copied = 0L
+                var lastCopyPct = -1
+                FileInputStream(apkFile).use { ins ->
+                    FileOutputStream(workingApk).use { outs ->
+                        val buf = ByteArray(1 shl 16)
+                        while (true) {
+                            val r = ins.read(buf)
+                            if (r < 0) break
+                            outs.write(buf, 0, r)
+                            copied += r
+                            val pct = if (copyTotal > 0) ((copied * 100L) / copyTotal).toInt() else 100
+                            if (pct != lastCopyPct) {
+                                lastCopyPct = pct
+                                stageTick(copied.toFloat() / copyTotal.coerceAtLeast(1L), "")
+                            }
+                        }
+                    }
+                }
+            }
+            stageDone(" — " + String.format("%.1f", workingApk.length() / (1024.0 * 1024.0)) + " МБ")
 
             if (patchRemoveAnalytics) {
-                sendLog(getString(R.string.status_patching_manifest), "INFO")
+                stageBegin()
                 val manifestPatchedApk = File(workDir, "manifest_patched.apk")
                 try {
                     val manifestCount = DexPatcher.patchManifest(workingApk, manifestPatchedApk)
                     if (manifestCount > 0) {
                         manifestPatchedApk.copyTo(workingApk, overwrite = true)
-                        sendLog(getString(R.string.log_manifest_removed, manifestCount), "SUCCESS")
+                        stageDone(" — правок: $manifestCount")
                         anyApplied = true
                     } else {
                         sendLog(getString(R.string.manifest_nothing_found), "WARNING")
+                        stageDone()
                     }
                 } catch (e: Exception) {
                     sendLog(getString(R.string.log_manifest_error, e.message), "WARNING")
+                    stageDone()
                 } finally {
                     manifestPatchedApk.delete()
                 }
             }
-            sendProgress(10)
 
             if (patchRemoveLocales) {
-                sendLog(getString(R.string.status_removing_locales), "INFO")
+                stageBegin()
                 val noLocalesApk = File(workDir, "no_locales.apk")
                 try {
                     val removedCount = DexPatcher.removeLocalesFromApk(workingApk, noLocalesApk, localesToRemove)
                     if (removedCount > 0) {
                         noLocalesApk.copyTo(workingApk, overwrite = true)
-                        sendLog(getString(R.string.log_locales_removed, removedCount), "SUCCESS")
+                        stageDone(" — удалено: $removedCount")
                         anyApplied = true
                     } else {
                         sendLog(getString(R.string.locales_not_found), "WARNING")
+                        stageDone()
                     }
                 } catch (e: Exception) {
                     sendLog(getString(R.string.log_locales_error, e.message), "WARNING")
+                    stageDone()
                 } finally {
                     noLocalesApk.delete()
                 }
-                sendProgress(13)
             }
 
             if (patchRemoveDpi) {
-                sendLog(getString(R.string.status_removing_dpi), "INFO")
+                stageBegin()
                 val noDpiApk = File(workDir, "no_dpi.apk")
                 try {
                     if (dpisToRemove.isNullOrEmpty()) {
                         sendLog(getString(R.string.dpi_not_selected), "WARNING")
+                        stageDone()
                     } else {
                         val removedCount = DpiRemove.removeDpisFromApk(workingApk, noDpiApk, dpisToRemove)
                         if (removedCount > 0) {
                             noDpiApk.copyTo(workingApk, overwrite = true)
-                            sendLog(getString(R.string.log_dpi_removed, removedCount), "SUCCESS")
+                            stageDone(" — удалено: $removedCount")
                             anyApplied = true
                         } else {
                             sendLog(getString(R.string.dpi_files_not_found), "WARNING")
+                            stageDone()
                         }
                     }
                 } catch (e: Exception) {
                     sendLog(getString(R.string.log_dpi_error, e.message), "WARNING")
+                    stageDone()
                 } finally {
                     noDpiApk.delete()
                 }
-                sendProgress(16)
             }
 
             if (patchRemoveLibs) {
-                sendLog(getString(R.string.status_removing_libs), "INFO")
+                stageBegin()
                 val noLibsApk = File(workDir, "no_libs.apk")
                 try {
                     if (libsToRemove.isNullOrEmpty()) {
                         sendLog(getString(R.string.archs_not_selected), "WARNING")
+                        stageDone()
                     } else {
                         val removedCount = removeArchLibs(workingApk, noLibsApk, libsToRemove)
                         if (removedCount > 0) {
                             noLibsApk.copyTo(workingApk, overwrite = true)
-                            sendLog(getString(R.string.log_libs_removed, removedCount), "SUCCESS")
+                            stageDone(" — удалено: $removedCount")
                             anyApplied = true
                         } else {
                             sendLog(getString(R.string.libs_not_found), "WARNING")
+                            stageDone()
                         }
                     }
                 } catch (e: Exception) {
                     sendLog(getString(R.string.log_libs_error, e.message), "WARNING")
+                    stageDone()
                 } finally {
                     noLibsApk.delete()
                 }
-                sendProgress(19)
             }
 
-            val needsDexPatching = patchGooglePlay || patchRemoveAds || patchRemoveAnalytics ||
-                    patchRemoveGPServices || patchRemoveVpn || patchRemoveInstallerCheck || patchRemoveUpdate || patchRemoveSignature || patchOptimize || patchAllowScreenshots || stubEdits.isNotEmpty() || codeEdits.isNotEmpty()
-
             if (needsDexPatching) {
+                stageBegin()
                 sendLog(getString(R.string.status_extracting_dex), "INFO")
                 val dexDir = File(workDir, "dex")
                 dexDir.mkdirs()
                 val dexFiles = ApkUtils.extractAllDex(workingApk, dexDir)
                 sendLog(getString(R.string.log_dex_count, dexFiles.size), "SUCCESS")
-                sendProgress(21)
+                stageTick(0f, "файлов: ${dexFiles.size}")
 
                 val patchedDexMap = HashMap<String, File>()
                 var totalGP = 0; var totalAds = 0; var totalAnalytics = 0
                 var totalGPServices = 0; var totalVpn = 0; var totalInstallerCheck = 0; var totalDebug = 0; var totalUpdate = 0; var totalScreenshots = 0; var totalStubs = 0; var totalCodeEdits = 0
 
                 val dexCount = dexFiles.size
-                val progressPerDex = if (dexCount > 0) 50.0 / dexCount else 0.0
 
                 for ((i, dex) in dexFiles.withIndex()) {
                     val dexStart = System.currentTimeMillis()
                     val dexSizeMb = String.format("%.1f", dex.length() / (1024.0 * 1024.0))
+                    stageTick(i.toFloat() / dexCount.coerceAtLeast(1), "${dex.name} · файл ${i + 1}/$dexCount")
                     sendLog("🔧 ${dex.name} (${dexSizeMb} MB)...", "INFO")
 
                     val patchedDex = File(workDir, "patched_${dex.name}")
@@ -470,7 +622,7 @@ class PatchService : Service() {
                         System.gc()
                     }
 
-                    sendProgress((21 + progressPerDex * (i + 1)).toInt().coerceAtMost(71))
+                    stageTick((i + 1f) / dexCount.coerceAtLeast(1), "")
                 }
 
                 if (totalGP + totalAds + totalAnalytics + totalGPServices + totalVpn + totalInstallerCheck + totalScreenshots > 0) anyApplied = true
@@ -489,7 +641,7 @@ class PatchService : Service() {
                 sendLog(getString(R.string.log_debug, totalDebug), if (totalDebug > 0) "SUCCESS" else "INFO")
 
                 if (patchRemoveSignature) {
-                    sendLog(getString(R.string.log_signature_kill_start), "INFO")
+                    stageBegin()
                     val killResult = try {
                         SignatureKiller.inject(
                             context = this,
@@ -503,21 +655,21 @@ class PatchService : Service() {
                     }
                     if (killResult.ok) {
                         anyApplied = true
-                        sendLog(getString(R.string.log_signature_kill_ok), "SUCCESS")
+                        stageDone()
                     } else {
                         sendLog(getString(R.string.log_signature_kill_fail, killResult.message), "ERROR")
-                        sendProgress(0)
+                        stageAbort(0)
                         return
                     }
                 }
 
                 if (patchRemoveUpdate && totalUpdate == 0 && !anyApplied && !patchOptimize) {
                     sendLog(getString(R.string.log_update_not_found_norebuild), "WARNING")
-                    sendProgress(0)
+                    stageAbort(0)
                     return
                 }
 
-                sendLog(getString(R.string.status_repacking), "INFO")
+                stageBegin()
                 val repackedApk = File(workDir, "repacked.apk")
                 val repackStart = System.currentTimeMillis()
                 var fastPacked = false
@@ -525,7 +677,14 @@ class PatchService : Service() {
                 try {
                     try {
                         // ⚡ Быстро: сырое копирование + замена DEX + очистка + выравнивание за один проход
-                        val counts = FastZipRepack.repack(workingApk, patchedDexMap, cleanedApk, applyClean = true)
+                        var lastRpt = -1
+                        val counts = FastZipRepack.repack(workingApk, patchedDexMap, cleanedApk, applyClean = true, onProgress = { dn, dt ->
+                            val pct = if (dt > 0) dn * 100 / dt else 100
+                            if (pct != lastRpt) {
+                                lastRpt = pct
+                                stageTick(if (dt > 0) dn.toFloat() / dt else 1f, "записей: $dn/$dt")
+                            }
+                        })
                         sendLog(getString(R.string.status_cleaning_kotlin), "INFO")
                         sendLog(getString(R.string.log_kept_removed, counts.kept, counts.removed), "SUCCESS")
                         fastPacked = true
@@ -549,6 +708,7 @@ class PatchService : Service() {
                         throw Exception("Repack failed")
                     }
                     sendLog("⚡ Перепаковка: ${System.currentTimeMillis() - repackStart} ms, ${String.format("%.1f", cleanedApk.length() / (1024.0 * 1024.0))} MB", "SUCCESS")
+                    stageDone(" — " + String.format("%.1f", cleanedApk.length() / (1024.0 * 1024.0)) + " МБ")
                 } finally {
                     // ✅ Удаляем патченные DEX и оригинал сразу
                     patchedDexMap.values.forEach { it.delete() }
@@ -557,30 +717,38 @@ class PatchService : Service() {
                     repackedApk.delete()
                     System.gc()
                 }
-                sendProgress(73)
-                sendProgress(80)
 
                 if (patchOptimize) {
                     anyApplied = true
-                    sendLog("📦 Оптимизация (сжатие)...", "INFO")
+                    stageBegin()
                     val optimizedApk = File(workDir, "optimized.apk")
                     try {
-                        val savedBytes = ZipOptimizer.recompressUltra(cleanedApk, optimizedApk)
+                        var lastOptPct = -1
+                        val savedBytes = ZipOptimizer.recompressUltra(cleanedApk, optimizedApk) { cb, ct ->
+                            val pct = if (ct > 0) ((cb * 100) / ct).toInt() else 100
+                            if (pct != lastOptPct) {
+                                lastOptPct = pct
+                                stageTick((cb.toFloat() / ct.coerceAtLeast(1L)).coerceIn(0f, 1f), "")
+                            }
+                        }
                         if (savedBytes > 0 && optimizedApk.exists()) {
                             cleanedApk.delete()
                             cleanedApk = optimizedApk
                             fastPacked = false
-                            sendLog("✅ Оптимизировано: -$savedBytes байт", "SUCCESS")
+                            stageDone(" — -$savedBytes байт")
                         } else {
                             optimizedApk.delete()
                             sendLog("⚠️ Сжатие не дало выигрыша, оставляем без изменений", "WARNING")
+                            stageDone()
                         }
                     } catch (e: Exception) {
                         optimizedApk.delete()
                         sendLog("⚠️ Оптимизация: ${e.message}", "WARNING")
+                        stageDone()
                     }
                 }
 
+                stageBegin()
                 val alignedApk = File(workDir, "aligned.apk")
                 try {
                     if (fastPacked) {
@@ -590,20 +758,18 @@ class PatchService : Service() {
                             cleanedApk.delete()
                         }
                         if (!alignedApk.exists() || alignedApk.length() == 0L) throw Exception("ZipAlign failed")
-                        sendLog("✅ ZipAlign: ${String.format("%.1f", alignedApk.length() / (1024.0 * 1024.0))} MB", "SUCCESS")
+                        stageDone(" — " + String.format("%.1f", alignedApk.length() / (1024.0 * 1024.0)) + " МБ")
                     } else {
-                        sendLog("📐 ZipAlign...", "INFO")
                         zipAlignWithARSCLib(cleanedApk, alignedApk)
                         if (!alignedApk.exists() || alignedApk.length() == 0L) throw Exception("ZipAlign failed")
-                        sendLog("✅ ZipAlign: ${String.format("%.1f", alignedApk.length() / (1024.0 * 1024.0))} MB", "SUCCESS")
+                        stageDone(" — " + String.format("%.1f", alignedApk.length() / (1024.0 * 1024.0)) + " МБ")
                     }
                 } finally {
                     cleanedApk.delete()
                     System.gc()
                 }
-                sendProgress(85)
 
-                sendLog(getString(R.string.status_signing), "INFO")
+                stageBegin()
                 val finalApk: File = if (signConfig.noSign) {
                     sendLog(getString(R.string.saving_original_signature_progress), "INFO")
                     val preservedApk = File(workDir, "presigned.apk")
@@ -613,13 +779,14 @@ class PatchService : Service() {
                     } else {
                         sendLog(getString(R.string.original_signature_not_saved), "WARNING")
                     }
+                    stageDone()
                     preservedApk
                 } else {
                     val signedApk = File(workDir, "signed.apk")
                     try {
                         SigningUtils.signApk(this, alignedApk, signedApk, signConfig)
                         if (!signedApk.exists() || signedApk.length() == 0L) throw Exception("Sign failed")
-                        sendLog(getString(R.string.log_signed_mb, String.format("%.1f", signedApk.length() / (1024.0 * 1024.0))), "SUCCESS")
+                        stageDone(" — " + String.format("%.1f", signedApk.length() / (1024.0 * 1024.0)) + " МБ")
                         signedApk
                     } catch (e: Exception) {
                         sendLog(getString(R.string.log_sign_error, e.message), "ERROR")
@@ -628,23 +795,23 @@ class PatchService : Service() {
                 }
                 alignedApk.delete()
                 System.gc()
-                sendProgress(90)
 
                 val outputName = "${apkFile.nameWithoutExtension}_patched.apk"
-                sendLog(getString(R.string.log_saving, outputName), "INFO")
+                stageBegin()
                 try {
                     FileSaver.saveApk(this, finalApk, outputName)
                     prepareForInstall(finalApk)
-                    sendProgress(100)
                     sendLog(getString(R.string.log_done_in_ms, System.currentTimeMillis() - totalStart), "SUCCESS")
                     sendLog("📁 " + SaveFolderHelper.getLocationLabel(this) + "/$outputName", "SUCCESS")
+                    stageDone(" — $outputName")
+                    sendProgress(100)
                 } finally {
                     finalApk.delete()
                 }
 
             } else {
                 if (patchRemoveLocales || patchRemoveDpi || patchRemoveLibs) {
-                    sendLog("📐 ZipAlign...", "INFO")
+                    stageBegin()
                     val alignedApk = File(workDir, "aligned.apk")
                     try {
                         try {
@@ -654,17 +821,17 @@ class PatchService : Service() {
                             zipAlignWithARSCLib(workingApk, alignedApk)
                         }
                         if (!alignedApk.exists() || alignedApk.length() == 0L) throw Exception("ZipAlign failed")
-                        sendLog("✅ ZipAlign: ${String.format("%.1f", alignedApk.length() / (1024.0 * 1024.0))} MB", "SUCCESS")
+                        stageDone(" — " + String.format("%.1f", alignedApk.length() / (1024.0 * 1024.0)) + " МБ")
                     } catch (e: Exception) {
                         sendLog("⚠️ ZipAlign: ${e.message}", "WARNING")
                         workingApk.copyTo(alignedApk, overwrite = true)
+                        stageDone()
                     } finally {
                         workingApk.delete()
                         System.gc()
                     }
-                    sendProgress(85)
 
-                    sendLog(getString(R.string.status_signing), "INFO")
+                    stageBegin()
                     val finalApk: File = if (signConfig.noSign) {
                         sendLog(getString(R.string.saving_original_signature_progress), "INFO")
                         val preservedApk = File(workDir, "presigned.apk")
@@ -674,13 +841,14 @@ class PatchService : Service() {
                         } else {
                             sendLog(getString(R.string.original_signature_not_saved), "WARNING")
                         }
+                        stageDone()
                         preservedApk
                     } else {
                         val signedApk = File(workDir, "signed.apk")
                         try {
                             SigningUtils.signApk(this, alignedApk, signedApk, signConfig)
                             if (!signedApk.exists() || signedApk.length() == 0L) throw Exception("Sign failed")
-                            sendLog(getString(R.string.signed), "SUCCESS")
+                            stageDone(" — " + String.format("%.1f", signedApk.length() / (1024.0 * 1024.0)) + " МБ")
                             signedApk
                         } catch (e: Exception) {
                             sendLog(getString(R.string.log_sign_error, e.message), "ERROR")
@@ -689,15 +857,15 @@ class PatchService : Service() {
                     }
                     alignedApk.delete()
                     System.gc()
-                    sendProgress(90)
 
                     val outputName = "${apkFile.nameWithoutExtension}_patched.apk"
-                    sendLog(getString(R.string.log_saving, outputName), "INFO")
+                    stageBegin()
                     try {
                         FileSaver.saveApk(this, finalApk, outputName)
                         prepareForInstall(finalApk)
-                        sendProgress(100)
                         sendLog(getString(R.string.log_done_in_ms, System.currentTimeMillis() - totalStart), "SUCCESS")
+                        stageDone(" — $outputName")
+                        sendProgress(100)
                     } finally {
                         finalApk.delete()
                     }
@@ -708,14 +876,15 @@ class PatchService : Service() {
 
         } catch (e: OutOfMemoryError) {
             sendLog(getString(R.string.oom_apk_too_large), "ERROR")
-            sendProgress(0)
+            stageAbort(0)
         } catch (e: Exception) {
             Log.e(TAG, "❌ Критическая ошибка", e)
             sendLog(getString(R.string.error_with_msg, e.message), "ERROR")
-            sendProgress(0)
+            stageAbort(0)
         } finally {
             workDir.deleteRecursively()
             System.gc()
+            runActive = false
             sendLog(getString(R.string.temp_files_removed), "INFO")
         }
     }

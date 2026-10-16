@@ -330,7 +330,7 @@ object DexPatcher {
                 inputDex.copyTo(outputDex, overwrite = true)
                 android.util.Log.d(TAG, "⏩ ${inputDex.name}: изменений нет — копия без пересборки")
             } else {
-                writeDexWithRepair(outputDex, opcodes, patchedClasses)
+                writeDexWithRepair(inputDex, outputDex, opcodes, patchedClasses)
             }
             android.util.Log.d(TAG, "📊 GP=$googlePlayCount, Ads(V)=$adsCount, Ads(Z)=$adsBooleanCount, URL=$urlsCount, ca-app-pub=$caAppPubCount, Analytics(URL)=$analyticsUrlCount, Analytics(Field)=$analyticsFieldCount, GP_Svc=$gpServicesCount, VPN=$vpnCount, Shots=$screenshotCount, Sign=$signatureCount, Debug=$debugItemsCount, Time=${System.currentTimeMillis() - startTime}ms")
         } catch (e: Exception) { android.util.Log.e(TAG, "❌ Ошибка: ${e.message}", e); throw e }
@@ -503,7 +503,7 @@ object DexPatcher {
             inputDex.copyTo(outputDex, overwrite = true)
             return 0
         }
-        writeDexWithRepair(outputDex, opcodes, newClasses)
+        writeDexWithRepair(inputDex, outputDex, opcodes, newClasses)
         return applied
     }
 
@@ -588,7 +588,7 @@ object DexPatcher {
             inputDex.copyTo(outputDex, overwrite = true)
             return 0
         }
-        writeDexWithRepair(outputDex, opcodes, newClasses)
+        writeDexWithRepair(inputDex, outputDex, opcodes, newClasses)
         return try {
             verifyCodeEdits(outputDex, edits, applied)
         } catch (_: Throwable) {
@@ -752,7 +752,37 @@ object DexPatcher {
         }
     }
 
-    private fun writeDexWithRepair(outputDex: File, opcodes: Opcodes, classes: List<org.jf.dexlib2.iface.ClassDef>) {
+    private fun writeDexWithRepair(inputDex: File, outputDex: File, opcodes: Opcodes, classes: List<org.jf.dexlib2.iface.ClassDef>) {
+        writeDexWithRepairRaw(outputDex, opcodes, classes)
+        normalizeDexVersion(inputDex, outputDex)
+    }
+
+    /**
+     * Возвращает версию формата выходного dex к версии входного (если входная старше).
+     * dexlib2 всегда пишет «039», но, например, «035»-файлы при этом получают у ART
+     * более строгую верификацию — часть классов может «потеряться» при загрузке
+     * (наблюдали NoClassDefFoundError после патча). Байты версии (4..7) не входят
+     * ни в checksum, ни в подпись dex, поэтому правка безопасна.
+     */
+    internal fun normalizeDexVersion(inputDex: File, outputDex: File) {
+        try {
+            val inB = inputDex.readBytes()
+            val outB = outputDex.readBytes()
+            if (inB.size < 8 || outB.size < 8) return
+            var same = true
+            for (i in 4..7) if (inB[i] != outB[i]) { same = false; break }
+            if (same) return
+            val inVer = String(inB, 4, 3, Charsets.US_ASCII)
+            val outVer = String(outB, 4, 3, Charsets.US_ASCII)
+            if (inVer >= outVer) return
+            for (i in 4..7) outB[i] = inB[i]
+            outputDex.writeBytes(outB)
+        } catch (t: Throwable) {
+            android.util.Log.w(TAG, "normalizeDexVersion: " + t.message)
+        }
+    }
+
+    private fun writeDexWithRepairRaw(outputDex: File, opcodes: Opcodes, classes: List<org.jf.dexlib2.iface.ClassDef>) {
         // Шаг 1: обычная запись
         try {
             DexFileFactory.writeDexFile(outputDex.absolutePath, ImmutableDexFile(opcodes, classes))

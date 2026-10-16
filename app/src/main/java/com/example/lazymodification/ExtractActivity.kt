@@ -37,6 +37,7 @@ class ExtractActivity : AppCompatActivity() {
         progressBar = findViewById(R.id.progressBar)
 
         rvApps.layoutManager = LinearLayoutManager(this)
+        findViewById<com.example.lazymodification.utils.DragScrollThumb>(R.id.extractScrollThumb).bind(rvApps)
         loadUserApps()
     }
 

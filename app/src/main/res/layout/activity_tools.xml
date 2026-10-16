@@ -23,30 +23,6 @@
             android:textStyle="bold" />
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnCreateSignature"
-            android:layout_width="match_parent"
-            android:layout_height="70dp"
-            android:layout_marginTop="16dp"
-            android:padding="12dp"
-            android:text="@string/tools_create_signature"
-            android:textSize="16sp"
-            app:icon="@drawable/ic_signature"
-            app:iconGravity="textStart"
-            app:iconPadding="12dp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnRemoveSignatureCheck"
-            android:layout_width="match_parent"
-            android:layout_height="70dp"
-            android:layout_marginTop="16dp"
-            android:padding="12dp"
-            android:text="@string/tools_kill_button"
-            android:textSize="16sp"
-            app:icon="@drawable/ic_tools"
-            app:iconGravity="textStart"
-            app:iconPadding="12dp" />
-
-        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnDexEditor"
             android:layout_width="match_parent"
             android:layout_height="70dp"
@@ -55,6 +31,30 @@
             android:text="@string/tools_dex_editor"
             android:textSize="16sp"
             app:icon="@drawable/ic_tools"
+            app:iconGravity="textStart"
+            app:iconPadding="12dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCompare"
+            android:layout_width="match_parent"
+            android:layout_height="70dp"
+            android:layout_marginTop="16dp"
+            android:padding="12dp"
+            android:text="@string/compare_apk"
+            android:textSize="16sp"
+            app:icon="@android:drawable/ic_menu_sort_by_size"
+            app:iconGravity="textStart"
+            app:iconPadding="12dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCreateSignature"
+            android:layout_width="match_parent"
+            android:layout_height="70dp"
+            android:layout_marginTop="16dp"
+            android:padding="12dp"
+            android:text="@string/tools_create_signature"
+            android:textSize="16sp"
+            app:icon="@drawable/ic_signature"
             app:iconGravity="textStart"
             app:iconPadding="12dp" />
 

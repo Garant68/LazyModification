@@ -70,6 +70,37 @@ class FastZipRepackTest {
         }
     }
 
+    @Test
+    fun repackCompressesReplacedDexWhenOriginalWasDeflated() {
+        val dir = File(System.getProperty("java.io.tmpdir"), "fzr_${System.nanoTime()}")
+        assertTrue(dir.mkdirs() || dir.isDirectory)
+        try {
+            val input = File(dir, "in.apk")
+            ZipOutputStream(FileOutputStream(input)).use { zos ->
+                fun addDeflated(name: String, data: ByteArray) {
+                    zos.putNextEntry(ZipEntry(name))
+                    zos.write(data)
+                    zos.closeEntry()
+                }
+                addDeflated("classes.dex", ByteArray(6000) { (it * 3).toByte() })
+                addDeflated("assets/foo.txt", ByteArray(300) { 2 })
+            }
+            val newDex = ByteArray(7000) { (it % 251).toByte() }
+            val newDexFile = File(dir, "new.dex")
+            newDexFile.writeBytes(newDex)
+            val out = File(dir, "out.apk")
+            FastZipRepack.repack(input, mapOf("classes.dex" to newDexFile), out, applyClean = false)
+            ZipFile(out).use { z ->
+                val e = z.getEntry("classes.dex")!!
+                assertEquals("dex должен остаться сжатым (как в оригинале)", ZipEntry.DEFLATED, e.method)
+                assertTrue("сжатый размер должен быть меньше исходного", e.compressedSize < e.size)
+                assertArrayEquals(newDex, z.getInputStream(e).readBytes())
+            }
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
     private fun assertStoredDataAligned(zip: File, entryName: String, align: Long) {
         RandomAccessFile(zip, "r").use { raf ->
             val len = raf.length()

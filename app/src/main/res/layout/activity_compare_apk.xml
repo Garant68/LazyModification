@@ -23,7 +23,10 @@
             android:id="@+id/lvChangedFiles"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1" />
+            android:layout_weight="1"
+            android:fastScrollEnabled="true"
+            android:fastScrollAlwaysVisible="true"
+            android:fastScrollThumbDrawable="@drawable/scroll_thumb" />
     </LinearLayout>
 
     <ProgressBar

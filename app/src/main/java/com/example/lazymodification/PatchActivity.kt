@@ -44,6 +44,7 @@ class PatchActivity : AppCompatActivity() {
     private lateinit var checkBoxRemoveLibs: MaterialButton
     private lateinit var checkBoxOptimize: MaterialButton
     private lateinit var btnInspectorApk: MaterialButton
+    private lateinit var btnRemoveSignatureCheck: MaterialButton
     private var isInspecting = false
     private var inspectorProgress: AlertDialog? = null
     private lateinit var btnPatch: MaterialButton
@@ -84,6 +85,24 @@ class PatchActivity : AppCompatActivity() {
         }
     }
 
+    private var killApkPath: String? = null
+
+    private val pickApkForKillLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val path = result.data?.getStringExtra(FileBrowserActivity.EXTRA_SELECTED_PATH)
+            if (path != null) {
+                val file = File(path)
+                if (file.exists()) {
+                    startKillFlow(path)
+                } else {
+                    Toast.makeText(this, getString(R.string.file_not_found), Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ThemeHelper.apply(this)
@@ -103,6 +122,7 @@ class PatchActivity : AppCompatActivity() {
         checkBoxRemoveLibs = findViewById(R.id.checkBoxRemoveLibs)
         checkBoxOptimize = findViewById(R.id.checkBoxOptimize)
         btnInspectorApk = findViewById(R.id.btnInspectorApk)
+        btnRemoveSignatureCheck = findViewById(R.id.btnRemoveSignatureCheck)
         btnPatch = findViewById(R.id.btnPatch)
 
         apkPath = intent.getStringExtra(EXTRA_APK_PATH)
@@ -239,6 +259,11 @@ class PatchActivity : AppCompatActivity() {
         }
 
         btnInspectorApk.setOnClickListener { runInspector() }
+        btnRemoveSignatureCheck.setOnClickListener {
+            pickApkForKillLauncher.launch(Intent(this, FileBrowserActivity::class.java).apply {
+                putExtra(FileBrowserActivity.EXTRA_FILE_MODE, FileBrowserActivity.MODE_APK)
+            })
+        }
     }
 
     private fun handleLibsCheckbox(isChecked: Boolean) {
@@ -661,6 +686,56 @@ class PatchActivity : AppCompatActivity() {
             },
             onConfirm = { config -> startPatching(config) }
         )
+    }
+
+    private fun startKillFlow(path: String) {
+        killApkPath = path
+        pendingSignConfirm = { config -> startKillPatching(config) }
+        SigningUtils.resolveSigningConfig(
+            activity = this,
+            onCustomSelected = { v1, v2, v3 ->
+                pendingV1 = v1; pendingV2 = v2; pendingV3 = v3
+                keystoreLauncher.launch(arrayOf("*/*"))
+            },
+            onConfirm = { config -> startKillPatching(config) }
+        )
+    }
+
+    private fun startKillPatching(config: SignatureConfig) {
+        val path = killApkPath ?: return
+        val serviceIntent = Intent(this, PatchService::class.java).apply {
+            putExtra(PatchService.EXTRA_APK_PATH, path)
+            putExtra(PatchService.EXTRA_PATCH_GOOGLE_PLAY, false)
+            putExtra(PatchService.EXTRA_PATCH_REMOVE_ADS, false)
+            putExtra(PatchService.EXTRA_PATCH_REMOVE_ANALYTICS, false)
+            putExtra(PatchService.EXTRA_PATCH_REMOVE_GP_SERVICES, false)
+            putExtra(PatchService.EXTRA_PATCH_REMOVE_VPN, false)
+            putExtra(PatchService.EXTRA_PATCH_REMOVE_INSTALLER_CHECK, false)
+            putExtra(PatchService.EXTRA_PATCH_REMOVE_UPDATE, false)
+            putExtra(PatchService.EXTRA_PATCH_REMOVE_SIGNATURE, true)
+            putExtra(PatchService.EXTRA_TOOLS_KILL_ONLY, true)
+            putExtra(PatchService.EXTRA_PATCH_REMOVE_LOCALES, false)
+            putExtra(PatchService.EXTRA_PATCH_REMOVE_DPI, false)
+            putExtra(PatchService.EXTRA_PATCH_REMOVE_LIBS, false)
+            putExtra(PatchService.EXTRA_PATCH_OPTIMIZE, false)
+            putExtra(PatchService.EXTRA_NO_SIGN, config.noSign)
+            putExtra(PatchService.EXTRA_SIGN_V1, config.signV1)
+            putExtra(PatchService.EXTRA_SIGN_V2, config.signV2)
+            putExtra(PatchService.EXTRA_SIGN_V3, config.signV3)
+            putExtra(PatchService.EXTRA_CUSTOM_KEYSTORE_PATH, config.customKeystorePath)
+            putExtra(PatchService.EXTRA_KEYSTORE_PASSWORD, config.keystorePassword)
+            putExtra(PatchService.EXTRA_KEY_ALIAS, config.keyAlias)
+            putExtra(PatchService.EXTRA_KEY_PASSWORD, config.keyPassword)
+            putExtra(PatchService.EXTRA_KEYSTORE_TYPE, config.keystoreType)
+        }
+        try {
+            startForegroundService(serviceIntent)
+            startActivity(Intent(this, LogActivity::class.java).apply {
+                putExtra("SOURCE_APK_PATH", path)
+            })
+        } catch (e: Exception) {
+            Toast.makeText(this, getString(R.string.error_msg_plain, e.message), Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun startPatching(config: SignatureConfig) {
