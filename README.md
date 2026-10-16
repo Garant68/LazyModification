@@ -33,6 +33,13 @@
   <img src="screenshots/4.jpg" width="220" alt="Скриншот 4">
 </p>
 
+<p align="center">
+  <img src="screenshots/5.jpg" width="220" alt="Скриншот 5">
+  <img src="screenshots/6.jpg" width="220" alt="Скриншот 6">
+  <img src="screenshots/7.jpg" width="220" alt="Скриншот 7">
+  <img src="screenshots/8.jpg" width="220" alt="Скриншот 8">
+</p>
+
 ## Что нового в 1.25
 
 * **Краш после патча — исправлено**: перепаковка больше не повышает версию формата dex (035 → 039), из-за чего часть приложений не запускалась после патчинга
