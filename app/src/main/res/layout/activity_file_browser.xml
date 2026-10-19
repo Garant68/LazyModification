@@ -5,11 +5,26 @@
     android:orientation="vertical"
     android:padding="8dp">
 
-    <ListView
-        android:id="@+id/lv_files"
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:fastScrollEnabled="true"
-        android:fastScrollAlwaysVisible="true"
-        android:fastScrollThumbDrawable="@drawable/scroll_thumb" />
+        android:layout_height="match_parent">
+
+        <ListView
+            android:id="@+id/lv_files"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fastScrollEnabled="true"
+            android:fastScrollAlwaysVisible="true"
+            android:fastScrollThumbDrawable="@drawable/scroll_thumb" />
+
+        <TextView
+            android:id="@+id/tvEmpty"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="@string/browser_empty"
+            android:textSize="16sp"
+            android:textColor="?attr/colorOnSurface"
+            android:visibility="gone" />
+    </FrameLayout>
 </LinearLayout>

@@ -45,6 +45,9 @@
         <item name="android:windowLightStatusBar">true</item>
 
         <!-- ✅ ПРИМЕНЯЕМ СТИЛИ ДЛЯ КНОПОК -->
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.LazyModification.Dialog</item>
+        <item name="editTextStyle">@style/Widget.LazyModification.EditText</item>
+        <item name="android:editTextStyle">@style/Widget.LazyModification.EditText</item>
         <item name="materialButtonStyle">@style/Widget.LazyModification.Button</item>
         <item name="materialButtonOutlinedStyle">@style/Widget.LazyModification.Button.Outlined</item>
     </style>

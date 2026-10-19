@@ -79,4 +79,19 @@
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="12dp" />
 
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnSignApk"
+        android:layout_width="0dp"
+        android:layout_height="70dp"
+        android:text="@string/sign_apk_title"
+        android:textSize="16sp"
+        android:padding="12dp"
+        app:icon="@drawable/ic_signature"
+        app:iconGravity="textStart"
+        app:iconPadding="12dp"
+        app:layout_constraintTop_toBottomOf="@id/btnClone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="12dp" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

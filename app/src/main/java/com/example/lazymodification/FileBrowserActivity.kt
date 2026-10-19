@@ -60,6 +60,7 @@ class FileBrowserActivity : AppCompatActivity() {
         setContentView(R.layout.activity_file_browser)
 
         listView = findViewById(R.id.lv_files)
+        listView.emptyView = findViewById(R.id.tvEmpty)
         fileMode = intent.getStringExtra(EXTRA_FILE_MODE) ?: MODE_ALL
 
         // ✅ Обработка системной кнопки "Назад" — возврат в родительскую папку

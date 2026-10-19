@@ -47,6 +47,19 @@ object FastZipRepack {
                 name == "DebugProbesKt.bin"
     }
 
+    /** Файлы v1-подписи исходного APK: после пересборки они недействительны и
+     *  дают «подпись оборвана» (установщик: «Не удалось обработать пакет»). */
+    fun isSignatureEntry(name: String): Boolean {
+        if (!name.startsWith("META-INF/")) return false
+        val base = name.substring(9)
+        if (base.contains('/')) return false
+        return base.equals("MANIFEST.MF", ignoreCase = true) ||
+                base.endsWith(".SF", ignoreCase = true) ||
+                base.endsWith(".RSA", ignoreCase = true) ||
+                base.endsWith(".DSA", ignoreCase = true) ||
+                base.endsWith(".EC", ignoreCase = true)
+    }
+
     private class Entry(
         val name: String, val method: Int, val flags: Int,
         val crc: Long, val compSize: Long, val uncompSize: Long,
@@ -58,6 +71,7 @@ object FastZipRepack {
         replacements: Map<String, File>,
         outputApk: File,
         applyClean: Boolean,
+        remove: Set<String> = emptySet(),
         onProgress: ((Int, Int) -> Unit)? = null
     ): Counts {
         if (outputApk.exists()) outputApk.delete()
@@ -177,7 +191,9 @@ object FastZipRepack {
                     processed++
                     onProgress?.invoke(processed, totalWork)
                     usedNames.add(e.name)
+                    if (isSignatureEntry(e.name)) { removed++; continue }
                     if (applyClean && shouldRemove(e.name)) { removed++; continue }
+                    if (remove.contains(e.name)) { removed++; continue }
                     val repl = replacements[e.name]
                     if (repl != null) {
                         writeFresh(e.name, repl.readBytes(), e.time, e.date, e.extAttr, e.method == 8)

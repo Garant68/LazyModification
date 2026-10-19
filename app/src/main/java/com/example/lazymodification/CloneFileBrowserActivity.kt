@@ -71,6 +71,7 @@ class CloneFileBrowserActivity : AppCompatActivity() {
         setContentView(R.layout.activity_file_browser)
 
         listView = findViewById(R.id.lv_files)
+        listView.emptyView = findViewById(R.id.tvEmpty)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {

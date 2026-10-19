@@ -74,5 +74,9 @@ class ApkOperationsActivity : AppCompatActivity() {
         findViewById<MaterialButton>(R.id.btnClone).setOnClickListener {
             startActivity(Intent(this, CloneFileBrowserActivity::class.java))
         }
+
+        findViewById<MaterialButton>(R.id.btnSignApk).setOnClickListener {
+            startActivity(Intent(this, SignApkActivity::class.java))
+        }
     }
 }

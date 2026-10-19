@@ -27,6 +27,8 @@ import com.example.lazymodification.utils.FastZipRepack
 import com.example.lazymodification.utils.SignatureConfig
 import com.example.lazymodification.utils.SigningUtils
 import com.example.lazymodification.utils.ZipOptimizer
+import com.example.lazymodification.utils.patches.ApkPatchRunner
+import com.example.lazymodification.utils.patches.PatchException
 import com.reandroid.apk.ApkModule
 import java.io.File
 import java.io.FileInputStream
@@ -39,6 +41,7 @@ class PatchService : Service() {
 
     companion object {
         const val EXTRA_APK_PATH = "apk_path"
+        const val EXTRA_CUSTOM_PATCHES = "custom_patch_paths"
         const val EXTRA_PATCH_GOOGLE_PLAY = "patch_google_play"
         const val EXTRA_PATCH_REMOVE_ADS = "patch_remove_ads"
         const val EXTRA_PATCH_REMOVE_ANALYTICS = "patch_remove_analytics"
@@ -143,6 +146,7 @@ class PatchService : Service() {
         startForeground(NOTIFICATION_ID, createNotification(getString(R.string.patching_apk_progress)))
 
         val apkPath = intent?.getStringExtra(EXTRA_APK_PATH)
+        val customPatches = intent?.getStringArrayListExtra(EXTRA_CUSTOM_PATCHES).orEmpty()
         val patchGooglePlay = intent?.getBooleanExtra(EXTRA_PATCH_GOOGLE_PLAY, false) ?: false
         val patchRemoveAds = intent?.getBooleanExtra(EXTRA_PATCH_REMOVE_ADS, false) ?: false
         val patchRemoveAnalytics = intent?.getBooleanExtra(EXTRA_PATCH_REMOVE_ANALYTICS, false) ?: false
@@ -222,7 +226,8 @@ class PatchService : Service() {
                     patchOptimize,
                     stubEdits,
                     codeEdits,
-                    signConfig
+                    signConfig,
+                    customPatches
                 )
             } catch (e: OutOfMemoryError) {
                 Log.e(TAG, "❌ OutOfMemoryError", e)
@@ -372,7 +377,8 @@ class PatchService : Service() {
         patchOptimize: Boolean,
         stubEdits: List<StubEdit>,
         codeEdits: List<CodeEdit>,
-        signConfig: SignatureConfig
+        signConfig: SignatureConfig,
+        customPatches: List<String>
     ) {
         sendProgress(0)
         val totalStart = System.currentTimeMillis()
@@ -392,10 +398,11 @@ class PatchService : Service() {
         // ===== План этапов (точный прогресс) =====
         val needsDexPatching = patchGooglePlay || patchRemoveAds || patchRemoveAnalytics ||
                 patchRemoveGPServices || patchRemoveVpn || patchRemoveInstallerCheck || patchRemoveUpdate || patchRemoveSignature || patchOptimize || patchAllowScreenshots || stubEdits.isNotEmpty() || codeEdits.isNotEmpty()
-        val hasTail = needsDexPatching || patchRemoveLocales || patchRemoveDpi || patchRemoveLibs
+        val hasTail = needsDexPatching || patchRemoveLocales || patchRemoveDpi || patchRemoveLibs || customPatches.isNotEmpty()
         stageNames.clear()
         stageWeights.clear()
         addStage("Копирование APK", 3f)
+        customPatches.forEach { addStage(getString(R.string.custom_patch_stage, File(it).name), 30f) }
         if (patchRemoveAnalytics) addStage("Патч манифеста", 3f)
         if (patchRemoveLocales) addStage("Удаление локалей", 3f)
         if (patchRemoveDpi) addStage("Удаление DPI", 3f)
@@ -444,6 +451,26 @@ class PatchService : Service() {
                 }
             }
             stageDone(" — " + String.format("%.1f", workingApk.length() / (1024.0 * 1024.0)) + " МБ")
+
+            var customApplied = false
+            customPatches.forEachIndexed { index, path ->
+                stageBegin()
+                val customOutput = File(workDir, "custom_$index.apk")
+                val result = ApkPatchRunner.apply(this, workingApk, File(path), customOutput, File(workDir, "custom_$index"),
+                    log = { sendLog(it, "INFO") }, progress = { fraction, detail -> stageTick(fraction, detail) })
+                if (result.changed) {
+                    customOutput.copyTo(workingApk, overwrite = true)
+                    customApplied = true; anyApplied = true
+                    stageDone(getString(R.string.custom_patch_result, result.matches, result.changedPaths.size))
+                } else {
+                    sendLog(getString(R.string.custom_patch_no_changes, File(path).name), "WARNING")
+                    stageDone()
+                }
+                customOutput.delete()
+                File(workDir, "custom_$index").deleteRecursively()
+            }
+            if (customPatches.isNotEmpty() && !customApplied && !needsDexPatching && !patchRemoveLocales && !patchRemoveDpi && !patchRemoveLibs)
+                throw PatchException(getString(R.string.custom_patch_nothing_applied))
 
             if (patchRemoveAnalytics) {
                 stageBegin()
@@ -810,7 +837,7 @@ class PatchService : Service() {
                 }
 
             } else {
-                if (patchRemoveLocales || patchRemoveDpi || patchRemoveLibs) {
+                if (patchRemoveLocales || patchRemoveDpi || patchRemoveLibs || customPatches.isNotEmpty()) {
                     stageBegin()
                     val alignedApk = File(workDir, "aligned.apk")
                     try {

@@ -15,8 +15,8 @@ android {
         applicationId = "com.example.lazymodification"
         minSdk = 21
         targetSdk = 35
-        versionCode = 125
-        versionName = "1.25"
+        versionCode = 126
+        versionName = "1.26"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -78,6 +78,9 @@ dependencies {
 
     // ✅ DexLib2 (для патчинга DEX)
     implementation("org.smali:dexlib2:2.5.2")
+    implementation("org.smali:baksmali:2.5.2")
+    implementation("org.smali:smali:2.5.2")
+
 
     // ✅ Lifecycle & Coroutines
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")

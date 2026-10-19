@@ -1,0 +1,40 @@
+<resources>
+    <string name="custom_patch_editor">Patch editor</string>
+    <string name="custom_patch_editor_help">APK Editor / PCompiler patches: patch.txt rules and additional files inside a ZIP. Add rules, validate the patch and save the ZIP.</string>
+    <string name="custom_patch_import">Open ZIP / TXT</string>
+    <string name="custom_patch_new">New patch</string>
+    <string name="custom_patch_add_rule">Add rule</string>
+    <string name="custom_patch_attach">Attach file</string>
+    <string name="custom_patch_examples">Example patches</string>
+    <string name="custom_patch_validate">Validate</string>
+    <string name="custom_patch_save_zip">Save ZIP</string>
+    <string name="custom_patch_payloads">Additional files: %1$d. Tap to remove a file.</string>
+    <string name="custom_patch_saved">Patch ZIP saved</string>
+    <string name="custom_patch_write_error">Could not save the file</string>
+    <string name="custom_patch_read_error">Could not read the patch</string>
+    <string name="custom_patch_new_confirm">Clear the current text and attached files?</string>
+    <string name="custom_patch_valid">Patch syntax validated</string>
+    <string name="custom_patch_summary">Author: %1$s\nPackage: %2$s\nRules: %3$d\n\nCompatibility with an APK is checked when applying the patch.</string>
+    <string name="custom_patch_missing_payload">Missing attached file in ZIP: %1$s</string>
+    <string name="custom_patch_payload_path">File path inside the ZIP</string>
+    <string name="custom_patch_reserved_name">The name patch.txt is reserved for rules</string>
+    <string name="custom_patch_remove_attachment">Remove attached file</string>
+    <string name="custom_patch_hint_name">Optional rule label</string>
+    <string name="custom_patch_hint_target">For example: smali*/*.smali</string>
+    <string name="custom_patch_hint_source">Relative file path inside the ZIP</string>
+    <string name="custom_patch_hint_match">Text or regular expression to find</string>
+    <string name="custom_patch_hint_replace">Replacement text; leave empty to delete matches</string>
+    <string name="custom_patch_hint_assign">Variable = ${GROUP1}</string>
+    <string name="custom_patch_hint_goto">Label of the next rule</string>
+    <string name="custom_patch_hint_class">Full class name of the DEX script</string>
+    <string name="custom_patch_hint_entrance">Method with four String parameters</string>
+    <string name="custom_patch_hint_param">DEX script parameter</string>
+    <string name="custom_patch_insert_rule">Insert rule</string>
+    <string name="custom_patch_required">Required field</string>
+    <string name="custom_patch_choose">APK Editor patches</string>
+    <string name="custom_patch_selected">Selected patches — open in editor</string>
+    <string name="custom_patch_stage">Patch: %1$s</string>
+    <string name="custom_patch_result"> — matches: %1$d, files: %2$d</string>
+    <string name="custom_patch_no_changes">Patch %1$s did not change the APK: no matches or changes already present.</string>
+    <string name="custom_patch_nothing_applied">None of the patches changed the APK. No new file was created.</string>
+</resources>

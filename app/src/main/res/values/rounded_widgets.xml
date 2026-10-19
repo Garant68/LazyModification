@@ -1,0 +1,20 @@
+<resources>
+    <style name="ThemeOverlay.LazyModification.Dialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="shapeAppearanceOverlay">@style/ShapeAppearanceOverlay.LazyModification.Dialog</item>
+        <item name="editTextStyle">@style/Widget.LazyModification.EditText</item>
+        <item name="android:editTextStyle">@style/Widget.LazyModification.EditText</item>
+    </style>
+    <style name="ShapeAppearanceOverlay.LazyModification.Dialog" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">24dp</item>
+    </style>
+    <style name="Widget.LazyModification.EditText" parent="Widget.AppCompat.EditText">
+        <item name="android:background">@drawable/rounded_input_background</item>
+        <item name="android:backgroundTint">@null</item>
+        <item name="backgroundTint">@null</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+        <item name="android:textColorHint">?attr/colorOnSurfaceVariant</item>
+        <item name="android:minHeight">56dp</item>
+        <item name="android:padding">12dp</item>
+    </style>
+</resources>

@@ -56,6 +56,26 @@
             app:iconGravity="textStart"
             app:iconPadding="12dp"/>
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCustomPatches"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:padding="16dp"
+            android:text="@string/custom_patch_choose"
+            android:textSize="16sp"
+            app:icon="@drawable/ic_tools" />
+
+        <TextView
+            android:id="@+id/customPatchSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:padding="8dp"
+            android:visibility="gone"
+            android:textColor="?attr/colorOnSurfaceVariant" />
+
+
                 <com.google.android.material.button.MaterialButton
             android:id="@+id/checkBoxGooglePlay"
             android:layout_width="match_parent"

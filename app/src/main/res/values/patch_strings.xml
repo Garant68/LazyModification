@@ -1,0 +1,40 @@
+<resources>
+    <string name="custom_patch_editor">Редактор патчей</string>
+    <string name="custom_patch_editor_help">Патчи APK Editor / PCompiler: правила в patch.txt и дополнительные файлы внутри ZIP. Добавьте правила, проверьте патч и сохраните ZIP.</string>
+    <string name="custom_patch_import">Открыть ZIP / TXT</string>
+    <string name="custom_patch_new">Новый патч</string>
+    <string name="custom_patch_add_rule">Добавить правило</string>
+    <string name="custom_patch_attach">Добавить файл</string>
+    <string name="custom_patch_examples">Примеры патчей</string>
+    <string name="custom_patch_validate">Проверить</string>
+    <string name="custom_patch_save_zip">Сохранить ZIP</string>
+    <string name="custom_patch_payloads">Дополнительные файлы: %1$d. Нажмите, чтобы удалить файл.</string>
+    <string name="custom_patch_saved">ZIP патча сохранён</string>
+    <string name="custom_patch_write_error">Не удалось сохранить файл</string>
+    <string name="custom_patch_read_error">Не удалось прочитать патч</string>
+    <string name="custom_patch_new_confirm">Очистить текущий текст и дополнительные файлы?</string>
+    <string name="custom_patch_valid">Синтаксис патча проверен</string>
+    <string name="custom_patch_summary">Автор: %1$s\nПакет: %2$s\nПравил: %3$d\n\nСовместимость с конкретным APK определяется при применении.</string>
+    <string name="custom_patch_missing_payload">В ZIP отсутствует дополнительный файл: %1$s</string>
+    <string name="custom_patch_payload_path">Путь файла внутри ZIP</string>
+    <string name="custom_patch_reserved_name">Имя patch.txt зарезервировано для правил</string>
+    <string name="custom_patch_remove_attachment">Удалить дополнительный файл</string>
+    <string name="custom_patch_hint_name">Имя метки, необязательно</string>
+    <string name="custom_patch_hint_target">Например: smali*/*.smali</string>
+    <string name="custom_patch_hint_source">Относительный путь файла в ZIP</string>
+    <string name="custom_patch_hint_match">Искомый текст или регулярное выражение</string>
+    <string name="custom_patch_hint_replace">Текст замены; пустое поле удаляет совпадение</string>
+    <string name="custom_patch_hint_assign">Переменная = ${GROUP1}</string>
+    <string name="custom_patch_hint_goto">Имя метки следующего правила</string>
+    <string name="custom_patch_hint_class">Полное имя класса DEX-скрипта</string>
+    <string name="custom_patch_hint_entrance">Метод с четырьмя параметрами String</string>
+    <string name="custom_patch_hint_param">Параметр DEX-скрипта</string>
+    <string name="custom_patch_insert_rule">Вставить правило</string>
+    <string name="custom_patch_required">Обязательное поле</string>
+    <string name="custom_patch_choose">Патчи APK Editor</string>
+    <string name="custom_patch_selected">Выбранные патчи — открыть в редакторе</string>
+    <string name="custom_patch_stage">Патч: %1$s</string>
+    <string name="custom_patch_result"> — совпадений: %1$d, файлов: %2$d</string>
+    <string name="custom_patch_no_changes">Патч %1$s не изменил APK: совпадений нет или результат уже применён.</string>
+    <string name="custom_patch_nothing_applied">Ни один патч не изменил APK. Новый файл не создан.</string>
+</resources>

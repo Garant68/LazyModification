@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="24dp">
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/custom_patch_editor" android:textColor="?attr/colorOnSurface"
+            android:textSize="24sp" android:textStyle="bold" android:gravity="center" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/custom_patch_editor_help" android:textColor="?attr/colorOnSurfaceVariant"
+            android:layout_marginTop="12dp" android:layout_marginBottom="12dp" />
+        <com.google.android.material.progressindicator.LinearProgressIndicator
+            android:id="@+id/patchEditorProgress" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:indeterminate="true" android:visibility="gone" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+            <com.google.android.material.button.MaterialButton android:id="@+id/patchEditorImport"
+                android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:layout_marginEnd="4dp" android:text="@string/custom_patch_import" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/patchEditorNew"
+                android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:layout_marginStart="4dp" android:text="@string/custom_patch_new" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+            <com.google.android.material.button.MaterialButton android:id="@+id/patchEditorAddRule"
+                android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:layout_marginEnd="4dp" android:text="@string/custom_patch_add_rule" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/patchEditorAttach"
+                android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:layout_marginStart="4dp" android:text="@string/custom_patch_attach" />
+        </LinearLayout>
+        <com.google.android.material.button.MaterialButton android:id="@+id/patchEditorExamples"
+            style="@style/Widget.Material3.Button.TextButton" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:text="@string/custom_patch_examples" />
+        <EditText android:id="@+id/patchEditorText" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:minLines="12" android:maxLines="28"
+            android:gravity="top|start" android:inputType="textMultiLine|textNoSuggestions"
+            android:fontFamily="monospace" android:textSize="13sp" android:saveEnabled="false"
+            android:scrollbars="vertical" android:hint="patch.txt" />
+        <TextView android:id="@+id/patchEditorPayloads" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:textColor="?attr/colorOnSurfaceVariant"
+            android:layout_marginTop="12dp" android:padding="8dp" android:textIsSelectable="true" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+            <com.google.android.material.button.MaterialButton android:id="@+id/patchEditorValidate"
+                android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:layout_marginEnd="4dp" android:text="@string/custom_patch_validate" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/patchEditorSave"
+                android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:layout_marginStart="4dp" android:text="@string/custom_patch_save_zip" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>
