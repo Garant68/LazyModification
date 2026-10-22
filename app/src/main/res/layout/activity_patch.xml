@@ -66,6 +66,7 @@
             android:textSize="16sp"
             app:icon="@drawable/ic_tools" />
 
+
         <TextView
             android:id="@+id/customPatchSummary"
             android:layout_width="match_parent"
@@ -187,8 +188,8 @@
             android:text="@string/remove_libs_archs"
             android:textSize="16sp"/>
 
-        <!-- ✅ НОВЫЙ ЧЕКБОКС: Оптимизация -->
-                <com.google.android.material.button.MaterialButton
+        <!-- ✅ ЧЕКБОКС: Оптимизация (UltraZip/Zopfli) -->
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/checkBoxOptimize"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -197,6 +198,7 @@
             android:padding="16dp"
             android:text="@string/optimize"
             android:textSize="16sp"/>
+
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnPatch"
             android:layout_width="match_parent"

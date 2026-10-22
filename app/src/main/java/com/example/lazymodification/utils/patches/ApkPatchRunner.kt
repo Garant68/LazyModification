@@ -29,41 +29,47 @@ object ApkPatchRunner {
             PatchFormat.writeZip(it, archive.readText(), emptyMap())
         } else archive
         val document = PatchFormat.read(patchArchive)
-        val project = File(directory, "project").apply { mkdirs() }
+        var project = File(directory, "project")
         val originalNames = linkedSetOf<String>()
-        ZipFile(input).use { zip ->
-            val entries = zip.entries()
-            while (entries.hasMoreElements()) {
-                val entry = entries.nextElement()
-                if (entry.isDirectory) continue
-                if (!originalNames.add(entry.name)) throw PatchException("Повтор ZIP-записи ${entry.name}")
-                val file = PatchFormat.child(project, entry.name)
-                file.parentFile?.mkdirs()
-                zip.getInputStream(entry).use { src -> file.outputStream().use { src.copyTo(it) } }
+        val cached = if (context != null && document.needsSmali) {
+            try { ApkProjectCache.load(context, input, directory) } catch (_: Throwable) { null }
+        } else null
+        val useCache = cached != null &&
+            (!document.needsResources || cached.resourceDir != null) &&
+            (!document.needsSmali || (cached.beforeSmali.isNotEmpty() && File(cached.project, "smali").isDirectory))
+        if (useCache) {
+            project = cached!!.project
+            originalNames.addAll(cached.originalNames)
+            log("Использую кэш разобранного APK — повторная распаковка не нужна")
+        } else {
+            if (cached != null) {
+                project.deleteRecursively()
+                File(directory, "resources").deleteRecursively()
+            }
+            project = File(directory, "project").apply { mkdirs() }
+            ZipFile(input).use { zip ->
+                val entries = zip.entries()
+                while (entries.hasMoreElements()) {
+                    val entry = entries.nextElement()
+                    if (entry.isDirectory) continue
+                    if (!originalNames.add(entry.name)) throw PatchException("Повтор ZIP-записи ${entry.name}")
+                    val file = PatchFormat.child(project, entry.name)
+                    file.parentFile?.mkdirs()
+                    zip.getInputStream(entry).use { src -> file.outputStream().use { src.copyTo(it) } }
+                }
             }
         }
         val module = ApkModule.loadApkFile(input)
-        var resourceProject: File? = null
-        var resourceDirectory: File? = null
+        var resourceProject: File? = if (useCache) cached!!.resources else null
+        var resourceDirectory: File? = if (useCache) cached!!.resourceDir else null
         val decodeSmali = document.needsSmali
         var sentinelVersion: String? = null
+        var versionCodeString = ""
         val metadata: PatchMetadata
         try {
             val manifest = module.androidManifest
             val pkg = manifest.packageName ?: throw PatchException("Не найдено имя пакета")
-            val versionCode = manifest.versionCode?.toString().orEmpty()
-            if (document.needsSmali && versionCode.length in 1..3 && document.rules.any { it.type == "EXECUTE_DEX" }) {
-                // DEX-скрипт ищет versionCode по всему smali. Короткий "52" встречается
-                // в тысячах несвязанных констант; подменяем его уникальным значением
-                // только в рабочей копии манифеста, чтобы скрипт менял реальные строки версии.
-                sentinelVersion = "2147483647"
-                val manifestFile = File(project, "AndroidManifest.xml")
-                if (manifestFile.isFile) {
-                    val text = manifestFile.readText()
-                    val old = Regex("(android:versionCode\\s*=\\s*\")" + Regex.escape(versionCode) + "(\")")
-                    manifestFile.writeText(text.replace(old, "$1$sentinelVersion$2"))
-                }
-            }
+            versionCodeString = manifest.versionCode?.toString().orEmpty()
             fun qualify(name: String?): String = when {
                 name.isNullOrEmpty() -> ""
                 name.startsWith('.') -> pkg + name
@@ -79,7 +85,7 @@ object ApkPatchRunner {
             }
             metadata = PatchMetadata(pkg, qualify(manifest.applicationClassName), activities,
                 listOf(qualify(manifest.mainActivityClassName)).filter { it.isNotEmpty() })
-            if (document.needsResources) {
+            if (document.needsResources && !useCache) {
                 progress(0.05f, "XML / ресурсы")
                 val decoded = File(directory, "resources")
                 val decoder = ApkModuleXmlDecoder(module)
@@ -96,10 +102,10 @@ object ApkPatchRunner {
 
         val dexApis = mutableMapOf<String, Int>()
         val beforeSmali = mutableMapOf<String, Map<String, String>>()
-        if (sentinelVersion != null) {
-            log("SMALI: versionCode временно заменён на $sentinelVersion, чтобы не переписать случайные константы")
-        }
-        if (decodeSmali) {
+        if (useCache) {
+            dexApis.putAll(cached!!.dexApis)
+            beforeSmali.putAll(cached.beforeSmali)
+        } else if (decodeSmali) {
             val dexFiles = project.listFiles().orEmpty().filter { it.name.matches(Regex("classes(?:[2-9]|[1-9][0-9]+)?\\.dex")) }.sortedBy { it.name }
             for ((index, dex) in dexFiles.withIndex()) {
                 progress(0.08f + 0.22f * index / dexFiles.size.coerceAtLeast(1), dex.name)
@@ -112,7 +118,28 @@ object ApkPatchRunner {
                 beforeSmali[name] = hashes(dir, skipSmali = false)
             }
         }
-        val baseline = hashes(project, skipSmali = true)
+        val baseline = if (useCache) cached!!.baseline else hashes(project, skipSmali = true)
+        if (!useCache && context != null && document.needsSmali) {
+            try {
+                ApkProjectCache.save(context, input, project, resourceProject, originalNames, dexApis, beforeSmali, baseline)
+                log("Кэш разобранного APK сохранён — следующий патч будет быстрее")
+            } catch (_: Throwable) {
+                // Кэш не критичен: патч продолжит работу без него.
+            }
+        }
+        if (decodeSmali && versionCodeString.length in 1..3 && document.rules.any { it.type == "EXECUTE_DEX" }) {
+            // DEX-скрипт ищет versionCode по всему smali. Короткий "52" встречается
+            // в тысячах несвязанных констант; подменяем его уникальным значением
+            // только в рабочей копии манифеста, чтобы скрипт менял реальные строки версии.
+            sentinelVersion = "2147483647"
+            log("SMALI: versionCode временно заменён на $sentinelVersion, чтобы не переписать случайные константы")
+            val manifestFile = File(project, "AndroidManifest.xml")
+            if (manifestFile.isFile) {
+                val text = manifestFile.readText()
+                val old = Regex("(android:versionCode\\s*=\\s*\")" + Regex.escape(versionCodeString) + "(\")")
+                manifestFile.writeText(text.replace(old, "$1$sentinelVersion$2"))
+            }
+        }
         val stats = PatchEngine(project, metadata, log) { rule, zip, root ->
             val ctx = context ?: throw PatchException("DEX-скрипт требует Android")
             if (rule.value("INTERFACE_VERSION").ifBlank { "1" } != "1") throw PatchException("Поддерживается INTERFACE_VERSION: 1")

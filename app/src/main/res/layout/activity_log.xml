@@ -36,6 +36,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textColor="?attr/colorOnSurfaceVariant"
+            android:textIsSelectable="true"
             android:textSize="12sp" />
     </LinearLayout>
 
@@ -91,6 +92,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textSize="12sp"
+                android:textIsSelectable="true"
                 android:fontFamily="monospace"
                 android:textColor="?attr/colorOnSurface"/>
         </ScrollView>
@@ -122,6 +124,16 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCopy"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/copy_log"
+            android:textSize="14sp"
+            android:padding="12dp"
+            android:layout_marginEnd="4dp"/>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSave"

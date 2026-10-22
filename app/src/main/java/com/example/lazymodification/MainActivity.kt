@@ -24,6 +24,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnInterface: MaterialButton
     private lateinit var btnTools: MaterialButton
     private lateinit var btnPatch: MaterialButton
+    private lateinit var btnHistory: MaterialButton
     private lateinit var btnExit: MaterialButton
 
     private var pendingV1 = true
@@ -133,6 +134,7 @@ class MainActivity : AppCompatActivity() {
         btnInterface = findViewById(R.id.btnInterface)
         btnTools = findViewById(R.id.btnTools)
         btnPatch = findViewById(R.id.btnPatch)
+        btnHistory = findViewById(R.id.btnHistory)
         btnExit = findViewById(R.id.btnExit)
 
         setupSettingsButton()
@@ -257,6 +259,9 @@ class MainActivity : AppCompatActivity() {
     private fun setupToolsButton() {
         btnTools.setOnClickListener {
             startActivity(Intent(this, ToolsActivity::class.java))
+        }
+        btnHistory.setOnClickListener {
+            startActivity(Intent(this, HistoryActivity::class.java))
         }
     }
 

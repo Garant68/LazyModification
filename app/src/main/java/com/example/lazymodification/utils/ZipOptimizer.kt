@@ -1,5 +1,7 @@
 package com.example.lazymodification.utils
 
+import com.googlecode.pngtastic.core.processing.zopfli.Options
+import com.googlecode.pngtastic.core.processing.zopfli.Zopfli
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
@@ -16,11 +18,13 @@ import java.util.zip.ZipInputStream
 
 /**
  * Экстремальное пересжатие APK: собственный ZIP-пережиматель.
- * Каждая запись сжимается DEFLATE level 9 с перебором стратегий (default/filtered/huffman-only),
- * выбирается минимальный результат; если сжатие не даёт выигрыша — запись хранится STORED.
+ * Текстовые/DEX-записи пересжимаются Zopfli, для мелких файлов используется быстрый zlib.
+ * Если сжатие не даёт выигрыша — запись хранится STORED.
  * Возвращает количество сэкономленных байт (может быть <= 0).
  */
 object ZipOptimizer {
+
+    private val zopfli = Zopfli(1 shl 20)
 
     fun recompressUltra(input: File, output: File, onProgress: ((Long, Long) -> Unit)? = null): Long {
         val before = input.length()
@@ -38,10 +42,9 @@ object ZipOptimizer {
                 val raw = zis.readBytes()
                 val crc = crc32(raw)
 
-                // Сохраняем исходный метод: STORED-записи (resources.arsc, PNG, .so) не сжимаем,
-                // иначе на Android 11+ APK не установится (сжатый resources.arsc = повреждённый пакет).
                 val originalMethod = entry.method
-                val compressed = if (originalMethod == ZipEntry.DEFLATED) compressUltra(raw) else null
+                val compressed = if (shouldCompress(name, originalMethod)) compressUltra(raw) else null
+                onProgress?.invoke(cin.count, totalBytes)
                 val method: Int
                 val data: ByteArray
                 if (compressed != null && compressed.size < raw.size) {
@@ -72,8 +75,35 @@ object ZipOptimizer {
         return before - output.length()
     }
 
+    /** resources.arsc и уже сжатые медиа/нативные библиотеки не трогаем. */
+    private fun shouldCompress(name: String, method: Int): Boolean {
+        if (name == "resources.arsc") return false
+        val ext = name.substringAfterLast('.', "").lowercase()
+        if (method == ZipEntry.STORED) {
+            if (ext in keepStoredExtensions) return false
+            if (ext !in textExtensions) return false
+        }
+        return true
+    }
+
     private fun compressUltra(data: ByteArray): ByteArray? {
         if (data.size < 16) return null
+        if (data.size >= 4096) {
+            try {
+                val iterations = if (data.size > 2 * 1024 * 1024) 5 else 15
+                val out = ByteArrayOutputStream((data.size / 2).coerceAtLeast(64))
+                zopfli.compress(
+                    Options(Options.OutputFormat.DEFLATE, Options.BlockSplitting.FIRST, iterations),
+                    data,
+                    out
+                )
+                return out.toByteArray()
+            } catch (_: OutOfMemoryError) {
+                System.gc()
+            } catch (_: Throwable) {
+                // Ниже — обычный zlib как страховка.
+            }
+        }
         var best: ByteArray? = null
         val strategies = intArrayOf(Deflater.DEFAULT_STRATEGY, Deflater.FILTERED, Deflater.HUFFMAN_ONLY)
         for (strategy in strategies) {
@@ -105,6 +135,15 @@ object ZipOptimizer {
 
     private const val METHOD_STORED = 0
     private const val METHOD_DEFLATED = 8
+
+    private val textExtensions = setOf(
+        "xml", "json", "txt", "version", "properties", "md", "html", "htm", "js", "css",
+        "smali", "proto", "csv", "yml", "yaml", "kotlin_builtins", "builtins", "dex"
+    )
+    private val keepStoredExtensions = setOf(
+        "png", "jpg", "jpeg", "webp", "gif", "bmp", "mp3", "mp4", "m4a", "ogg", "wav",
+        "flac", "arsc", "so", "zip", "apk", "jar", "7z", "rar"
+    )
 
     private data class EntryMeta(
         val name: String, val method: Int, val crc: Long,

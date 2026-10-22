@@ -1,478 +1,1053 @@
-<resources>
-    <string name="app_name">Lazy Modification</string>
-
-    <!-- Main screen -->
-    <string name="settings">Settings</string>
-    <string name="convert_apks">Convert APKs</string>
-    <string name="extract_apk">Extract APK</string>
-    <string name="split_apk">Split APK</string>
-    <string name="clone_apk">Clone APK</string>
-    <string name="apk_operations">APK Operations</string>
-    <string name="general_edit">General editing</string>
-    <string name="modify_app_interface">Modify app interface</string>
-    <string name="patching">Patching</string>
-    <string name="exit">Exit</string>
-
-    <!-- Settings menu -->
-    <string name="toggle_theme">Toggle theme</string>
-    <string name="sort">Sort</string>
-    <string name="sort_by_name">By name</string>
-    <string name="sort_by_date">By modification date</string>
-    <string name="sort_by_size">By size</string>
-    <string name="signature">Signature</string>
-    <string name="language">Language</string>
-    <string name="lang_ru">Русский</string>
-    <string name="lang_en">English</string>
-
-    <!-- Common -->
-    <string name="file_not_selected">File: not selected</string>
-    <string name="back">Back</string>
-    <string name="apply">Apply</string>
-    <string name="edit">Edit</string>
-    <string name="install">Install</string>
-    <string name="save">Save</string>
-    <string name="close">Close</string>
-    <string name="app_icon">App icon</string>
-    <string name="name">Name</string>
-    <string name="version">Version</string>
-    <string name="build_number">Build number</string>
-
-    <!-- Cloning -->
-    <string name="clone_apk_title">Clone APK</string>
-    <string name="clone">Clone</string>
-    <string name="package_name_label">Package name:</string>
-    <string name="package_suffix_hint">⚠️ You can only change the last 3 characters of the package</string>
-
-    <!-- Conversion -->
-    <string name="choose_file_apks_xapk">Choose file (.apks/.xapk)</string>
-
-    <!-- APK editing -->
-    <string name="min_sdk_version">Minimum SDK version</string>
-    <string name="target_sdk_version">Target SDK version</string>
-    <string name="remove_internet_access">Remove internet access</string>
-    <string name="disable_internet">Disable internet</string>
-    <string name="disable_direct_boot">Disable Direct Boot</string>
-    <string name="disable_autostart">Disable autostart on boot</string>
-    <string name="disable_autostart_short">Disable autostart</string>
-    <string name="fix_google_maps">Fix Google Maps</string>
-    <string name="convert_for_atv">Convert for ATV</string>
-
-    <!-- Extraction -->
-    <string name="user_apps">User apps</string>
-    <string name="loading_list">Loading list...</string>
-
-    <!-- Interface modification -->
-    <string name="interface_modify">Interface modification</string>
-    <string name="remove_menu_items">Remove menu items</string>
-    <string name="insert_marquee">Insert marquee</string>
-    <string name="enter_menu_items_to_remove">Enter menu item names to remove:</string>
-    <string name="add_item">+ Add item</string>
-
-    <!-- Log -->
-    <string name="patching_log">Patching log</string>
-
-    <!-- Patching -->
-    <string name="patching_apk">Patch APK</string>
-    <string name="remove_google_play_redirect">Remove Google Play redirect</string>
-    <string name="remove_ads_calls">Remove ad calls</string>
-    <string name="remove_analytics">Remove analytics</string>
-    <string name="remove_gp_services">Remove GP services</string>
-    <string name="remove_vpn_detection">Remove VPN detection</string>
-    <string name="remove_locale_packages">Remove locale packages</string>
-    <string name="remove_dpi_duplicates">Remove duplicate graphics (DPI)</string>
-    <string name="remove_libs_archs">Remove libraries (architectures)</string>
-    <string name="optimize">Optimize (reduce size)</string>
-    <string name="start_patching">Start patching</string>
-
-    <!-- Split APK -->
-    <string name="choose_architectures">Choose architectures:</string>
-    <string name="split">Split</string>
-
-    <string name="status_insert_marquee">⏳ Inserting marquee...</string>
-    <string name="status_cloning">⏳ Cloning...</string>
-    <string name="status_processing">⏳ Processing...</string>
-    <string name="status_preparing">⏳ Preparing...</string>
-    <string name="status_searching_launcher">⏳ Searching for launcher activity...</string>
-    <string name="status_saving">⏳ Saving...</string>
-    <string name="status_removing_menu">⏳ Removing menu items...</string>
-    <string name="status_reading_dpi_apk">⏳ Reading DPI from APK...</string>
-    <string name="status_reading_dpi">⏳ Reading DPI...</string>
-    <string name="status_reading_archs_apk">⏳ Reading architectures from APK...</string>
-    <string name="status_reading_archs">⏳ Reading architectures...</string>
-    <string name="status_reading_package">⏳ Reading package...</string>
-    <string name="status_reading_locales_apk">⏳ Reading languages from APK...</string>
-    <string name="status_reading_locales">⏳ Reading languages...</string>
-    <string name="done">✅ Done!</string>
-    <string name="icon_selected">✅ Icon selected. You can save now.</string>
-    <string name="signed_preserved_signinfo">✅ Original signature data saved</string>
-    <string name="signed">✅ Signed</string>
-    <string name="err_keystore_not_selected">❌ Keystore not selected</string>
-    <string name="oom_apk_too_large">❌ OutOfMemoryError: APK too large to process</string>
-    <string name="enter_package_name">❌ Enter package name</string>
-    <string name="enter_new_chars">❌ Enter new characters</string>
-    <string name="enter_at_least_one_menu_item">❌ Enter at least one menu item</string>
-    <string name="choose_apk_file">❌ Choose an .apk file</string>
-    <string name="choose_png_file">❌ Choose a PNG file</string>
-    <string name="choose_at_least_one_option">❌ Choose at least one option</string>
-    <string name="launcher_not_found">❌ Launcher activity not found</string>
-    <string name="package_name_too_short">❌ Package name too short</string>
-    <string name="apk_read_failed">❌ Failed to read APK</string>
-    <string name="err_keystore_read_failed">❌ Failed to read keystore</string>
-    <string name="unknown_source_path">❌ Unknown source file path</string>
-    <string name="oom">❌ Out of memory</string>
-    <string name="oom_file_too_large">❌ Out of memory: file too large. Try a smaller APK.</string>
-    <string name="error">❌ Error</string>
-    <string name="invalid_file">❌ Error: invalid file</string>
-    <string name="apk_path_not_set">❌ APK path not set</string>
-    <string name="storage_permission_denied">❌ File access permission not granted</string>
-    <string name="install_permission_denied">❌ Install permission not granted</string>
-    <string name="permission_denied">❌ Permission not granted</string>
-    <string name="apk_file_not_found">❌ APK file not found</string>
-    <string name="apk_file_not_exists">❌ APK file does not exist</string>
-    <string name="testkey_not_found">❌ testkey.p12 not found in assets</string>
-    <string name="file_not_selected_err">❌ File not selected</string>
-    <string name="not_apks_xapk">❌ File not found or not .apks/.xapk</string>
-    <string name="file_not_exists">❌ File does not exist</string>
-    <string name="file_not_specified">❌ File not specified</string>
-    <string name="patched_apk_not_found">❌ Patched APK file not found</string>
-    <string name="file_too_large">❌ File too large to process on this device</string>
-    <string name="dpi_not_selected">⚠️ No DPI selected</string>
-    <string name="dpi_not_found">⚠️ No DPI found</string>
-    <string name="dpi_files_not_found">⚠️ DPI files not found</string>
-    <string name="archs_not_selected">⚠️ No architectures selected</string>
-    <string name="archs_not_found">⚠️ No architectures found</string>
-    <string name="libs_not_found">⚠️ No libraries found</string>
-    <string name="choose_at_least_one_arch">⚠️ Choose at least one architecture</string>
-    <string name="signature_conflict">⚠️ Signature conflict</string>
-    <string name="locales_not_found">⚠️ No localizations found</string>
-    <string name="manifest_nothing_found">⚠️ Manifest: nothing found</string>
-    <string name="no_option_selected">⚠️ No option selected</string>
-    <string name="app_not_removed">⚠️ App was not removed</string>
-    <string name="app_not_removed_install_cancelled">⚠️ App was not removed. Installation cancelled.</string>
-    <string name="allow_unknown_sources">⚠️ Allow installation from unknown sources</string>
-    <string name="marquee_settings">⚙️ Marquee settings</string>
-    <string name="three_times">3 times</string>
-    <string name="keystore_not_selected">Keystore not selected</string>
-    <string name="white">White</string>
-    <string name="infinite">Infinite</string>
-    <string name="libs_will_be_removed">Libraries of the selected architectures will be removed from the APK:</string>
-    <string name="enter_new_package_name">Enter new package name:</string>
-    <string name="enter_menu_item_text">Enter menu item text</string>
-    <string name="top">Top</string>
-    <string name="all_files">All files</string>
-    <string name="light_blue">Light blue</string>
-    <string name="yellow">Yellow</string>
-    <string name="green">Green</string>
-    <string name="apks_conversion_done">APKS conversion complete</string>
-    <string name="xapk_conversion_done">XAPK conversion complete</string>
-    <string name="red">Red</string>
-    <string name="keystore_read_failed">Failed to read keystore</string>
-    <string name="bottom">Bottom</string>
-    <string name="new_package_name">New package name</string>
-    <string name="ok">OK</string>
-    <string name="orange">Orange</string>
-    <string name="cancel_upper">CANCEL</string>
-    <string name="patching_apk_progress">Patching APK...</string>
-    <string name="repetitions">Repetitions:</string>
-    <string name="signature_saved">Signature saved</string>
-    <string name="user_apps_not_found">No user apps found</string>
-    <string name="text_size_sp">Text size (sp)</string>
-    <string name="position">Position:</string>
-    <string name="pink">Pink</string>
-    <string name="patching_service">APK patching service</string>
-    <string name="middle">Middle</string>
-    <string name="gray">Gray</string>
-    <string name="blue">Blue</string>
-    <string name="marquee_text">Marquee text</string>
-    <string name="uninstall_and_install">Uninstall and install</string>
-    <string name="uninstall_and_install_question">Uninstall and install the patched version?</string>
-    <string name="file_not_found">File not found</string>
-    <string name="browser_empty">No files found</string>
-    <string name="purple">Purple</string>
-    <string name="install_modified_question">Install the modified app?</string>
-    <string name="text_color">Text color:</string>
-    <string name="black">Black</string>
-    <string name="choose_locales">🌍 Choose languages to remove</string>
-    <string name="status_removing_locales">🌍 Removing localizations...</string>
-    <string name="choose_archs">🏗️ Choose architectures to remove</string>
-    <string name="status_removing_libs">🏗️ Removing libraries...</string>
-    <string name="no_files_access">📁 No access to files or folder is empty</string>
-    <string name="status_copying_apk">📋 Copying APK...</string>
-    <string name="status_zipalign">📐 Aligning (ZipAlign)...</string>
-    <string name="status_patching_manifest">📜 Patching AndroidManifest.xml...</string>
-    <string name="status_extracting_dex">📦 Extracting DEX...</string>
-    <string name="status_repacking">📦 Repacking...</string>
-    <string name="old_removed_installing_patched">📦 Old app removed. Installing patched...</string>
-    <string name="old_removed_installing">📦 Old app removed. Installing...</string>
-    <string name="install_question">📦 Install app?</string>
-    <string name="choose_dpi">📱 Choose DPI to remove</string>
-    <string name="status_removing_dpi">📱 Removing DPI graphics...</string>
-    <string name="status_signing_apk">🔐 Signing APK...</string>
-    <string name="status_signing">🔐 Signing...</string>
-    <string name="original_signature_preserved">🔑 Original signature data saved</string>
-    <string name="saving_original_signature">🔑 Saving original signature</string>
-    <string name="saving_original_signature_progress">🔑 Saving original signature...</string>
-    <string name="temp_files_removed">🗑️ Temporary files removed</string>
-    <string name="status_cleaning_kotlin">🧹 Cleaning kotlin/ and metadata...</string>
-
-    <string name="file_label">File: %1$s</string>
-    <string name="error_with_msg">❌ Error: %1$s</string>
-    <string name="error_msg_plain">Error: %1$s</string>
-    <string name="install_error_msg">❌ Install error: %1$s</string>
-    <string name="uninstall_error_msg">❌ Uninstall error: %1$s</string>
-    <string name="log_save_error_msg">❌ Log save error: %1$s</string>
-    <string name="launch_error_msg">❌ Launch error: %1$s</string>
-    <string name="extracting_app">⏳ Extracting %1$s...</string>
-    <string name="edit_title">Edit: %1$s</string>
-    <string name="launcher_found">✅ Launcher activity: %1$s</string>
-    <string name="marquee_settings_saved">✅ Settings: «%1$s...»</string>
-    <string name="creating_apk_for">⏳ Creating APK for %1$s...</string>
-    <string name="saved_to_downloads">✅ Saved: %1$s\n📁 %2$s</string>
-    <string name="cloned_success">✅ Cloned!\n📦 New package: %1$s\n%2$s\n📁 %3$s/%4$s</string>
-    <string name="cloned_success_fb">✅ Cloned!\n Package: %1$s\n%2$s\n %3$s</string>
-    <string name="saved_success">✅ Saved: %1$s\n%2$s\n📁 %3$s</string>
-    <string name="done_success">✅ Done!\n📁 %1$s/%2$s\n%3$s</string>
-    <string name="log_saved_success">✅ Log saved:\n%1$s</string>
-    <string name="created_success">✅ Created:\n%1$s\n\n%2$s</string>
-    <string name="log_locales_selected">🌍 Locales selected: %1$d</string>
-    <string name="log_dpi_selected">📱 DPI selected: %1$s</string>
-    <string name="log_archs_selected">🏗️ Architectures to remove: %1$s</string>
-    <string name="log_signature">🔐 Signature: %1$s</string>
-    <string name="log_manifest_removed">✅ Manifest: %1$d components removed</string>
-    <string name="log_manifest_error">⚠️ Manifest: %1$s</string>
-    <string name="log_locales_removed">✅ Locales removed: %1$d</string>
-    <string name="log_locales_error">⚠️ Localizations: %1$s</string>
-    <string name="log_dpi_removed">✅ DPI files removed: %1$d</string>
-    <string name="log_dpi_error">⚠️ DPI: %1$s</string>
-    <string name="log_libs_removed">✅ Libraries removed: %1$d</string>
-    <string name="log_libs_error">⚠️ Libraries: %1$s</string>
-    <string name="log_dex_count">✅ DEX: %1$d files</string>
-    <string name="log_oom_dex">❌ OOM on %1$s (%2$s MB). File too large.</string>
-    <string name="log_ads">✅ Ads: %1$d</string>
-    <string name="log_analytics">✅ Analytics: %1$d</string>
-    <string name="log_gp_services">✅ GP Services: %1$d</string>
-    <string name="log_debug">✅ Debug info: %1$d items removed</string>
-    <string name="log_kept_removed">✅ Kept: %1$d | Removed: %2$d</string>
-    <string name="log_cleanup_error">⚠️ Cleanup: %1$s</string>
-    <string name="log_sign_error">❌ Signing: %1$s</string>
-    <string name="log_saving">💾 Saving: %1$s</string>
-    <string name="log_done_in_ms">✅ Done in %1$dms</string>
-    <string name="sig_mismatch_part1">App «%1$s» is already installed with a different signature.\n\n</string>
-    <string name="sig_mismatch_part2">To install the patched version, first uninstall the installed app.\n\n</string>
-    <string name="split_apk_files">📦 Split APK (%1$d files)</string>
-    <string name="log_start">🚀 Start: %1$s (%2$s MB)</string>
-    <string name="log_copied_mb">✅ Copied: %1$s MB</string>
-    <string name="log_repacked_mb">✅ Repacked: %1$s MB</string>
-    <string name="log_signed_mb">✅ Signed: %1$s MB</string>
-    <string name="unknown">unknown</string>
-    <string name="log_apk_prepared">📦 APK prepared for install (package: %1$s)</string>
-    <string name="cancel">Cancel</string>
-    <string name="cloning">Cloning</string>
-    <string name="log_custom_signature">🔑 Custom signature V1=%1$s, V2=%2$s, V3=%3$s</string>
-    <string name="signing_v1_label">V1 (JAR) signature</string>
-    <string name="signing_v2_label">V2 signature</string>
-    <string name="signing_v3_label">V3 signature</string>
-    <string name="signing_no_sign">⛔ Do not sign APK (preserve original signature)</string>
-    <string name="signing_custom_keystore">🔑 Custom keystore</string>
-    <string name="signing_options_title">🔐 APK signing options</string>
-    <string name="signing_options_message">Choose signing schemes for the resulting APK:</string>
-    <string name="signing_choose_scheme">⚠️ Choose at least one signing scheme</string>
-    <string name="use">Use</string>
-    <string name="choose_another">Choose another</string>
-    <string name="keystore_type_label">Keystore type:</string>
-    <string name="keystore_type_pkcs12">PKCS12 (.p12/.pfx)</string>
-    <string name="keystore_type_jks">JKS (.jks/.keystore)</string>
-    <string name="keystore_password_hint">Keystore password</string>
-    <string name="key_alias_hint">Key alias</string>
-    <string name="key_password_hint">Key password (if different)</string>
-    <string name="sign_confirm">Sign</string>
-    <string name="signing_password_alias_empty">❌ Password and alias cannot be empty</string>
-    <string name="none">none</string>
-    <string name="keystore_file_message">File: %1$s\nEnter keystore data:</string>
-    <string name="keystore_type_auto">ℹ️ Type detected automatically: %1$s</string>
-    <string name="keystore_alias_not_found">❌ Alias «%1$s» not found. Available: %2$s</string>
-    <string name="keystore_error">❌ Keystore error: %1$s</string>
-    <string name="use_saved_keystore_question">Use saved signature?\n\n</string>
-    <string name="file_with_newline">File: %1$s\n</string>
-    <string name="alias_with_newline">Alias: %1$s\n</string>
-    <string name="type_label">Type: %1$s</string>    <string name="save_folder">Save folder</string>
-    <string name="choose_folder">Choose folder</string>
-    <string name="default_folder">Default</string>
-    <string name="save_folder_set">Save folder: %1$s</string>
-    <string name="save_folder_reset">Using default folder (Download/LazyModification)</string>
-    <string name="remove_installer_check">Remove installer check</string>
-    <string name="lang_bg">Български</string>
-    <string name="compare_apk">Compare APK</string>
-    <string name="compare_axml">Compare Axml</string>
-    <string name="compare_dex">Compare Dex</string>
-    <string name="compare_dex_result_title">Comparison</string>
-    <string name="comparing_dex">Comparing...</string>
-    <string name="compare_no_differences">No differences found</string>
-    <string name="compare_classes_only_1">Classes only in APK 1</string>
-    <string name="compare_classes_only_2">Classes only in APK 2</string>
-    <string name="compare_strings_only_1">Strings only in APK 1</string>
-    <string name="compare_strings_only_2">Strings only in APK 2</string>
-    <string name="select_option">Select at least one option</string>
-    <string name="coming_soon">Coming soon</string>
-    <string name="compare_apk1_label">APK 1: %1$s</string>
-    <string name="compare_apk2_label">APK 2: %1$s</string>
-    <string name="compare_diff_count">Differences: %1$d</string>
-    <string name="compare_truncated">not all differences shown</string>
-    <string name="compare_changed_files">Changed files: %1$d</string>
-    <string name="compare_apk1">APK 1</string>
-    <string name="compare_apk2">APK 2</string>
-    <string name="ignore_debug_info">Ignore debug info</string>
-    <string name="ignore_nop">Ignore nop instructions</string>
-    <string name="compare_options">Comparison options</string>
-    <string name="compare_legend">blue — changed · red — removed · green — added</string>
-    <string name="ignore_ad_calls">Ignore ad calls</string>
-    <string name="ignore_analytics">Ignore analytics</string>
-    <string name="option_not_available">This option is not available to you</string>
-    <string name="locale_bho">Bhojpuri</string>
-    <string name="locale_ceb">Cebuano</string>
-    <string name="locale_ckb">Central Kurdish (Sorani)</string>
-    <string name="locale_doi">Dogri</string>
-    <string name="locale_fil">Filipino</string>
-    <string name="locale_haw">Hawaiian</string>
-    <string name="locale_hmn">Hmong</string>
-    <string name="locale_ilo">Ilocano</string>
-    <string name="locale_jw">Javanese</string>
-    <string name="locale_kri">Krio</string>
-    <string name="locale_lus">Mizo (Lushai)</string>
-    <string name="locale_mai">Maithili</string>
-    <string name="locale_nso">Northern Sotho (Sepedi)</string>
-    <string name="err_app_flutter">This is a Flutter (Dart) app: the menu is built in code — automatic item removal is not possible.</string>
-    <string name="err_app_compose">This is a Jetpack Compose app: items are built in code — automatic removal is not possible.</string>    <string name="translate_app_button">Translate app</string>
-    <string name="translator_label">Translator:</string>
-    <string name="translator_google">Google</string>
-    <string name="translator_mymemory">MyMemory</string>
-    <string name="translator_azure">Azure Translator</string>
-    <string name="translator_deepl">DeepL Free</string>
-    <string name="azure_key_hint">Azure Translator key</string>
-    <string name="azure_region_hint">Azure region (e.g. westeurope)</string>
-    <string name="deepl_key_hint">DeepL key</string>
-    <string name="start_translate">Start translation</string>
-    <string name="status_preparing_strings">Preparing strings…</string>
-    <string name="status_translating">Translating: %1$d of %2$d…</string>
-    <string name="translations_preview">Preview: %1$d strings</string>
-    <string name="apply_translations">Apply translation</string>
-    <string name="err_translator_key_required">Enter the key for the selected translator</string>
-    <string name="err_translate_empty">No strings found to translate</string>
-    <string name="err_translate_failed">Translation error: %1$s</string>
-    <string name="translations_applied">✅ Translations applied (Russian locale)</string>
-    <string name="status_translations_write">Writing Russian locale…</string>
-    <string name="preview_truncated">…showing first %1$d strings</string>    <string name="translations_edit_hint">You can edit translations directly in the list</string>    <string name="mode_label">Mode:</string>
-    <string name="mode_fast">Quick translation</string>
-    <string name="mode_full">Full translation</string>
-    <string name="fast_strings_hint">Strings to translate, comma-separated</string>
-    <string name="fast_strings_note">Comma-separated. Translator: MyMemory.</string>
-    <string name="fast_translate_action">Translate</string>
-    <string name="err_fast_empty">Enter strings to translate, comma-separated</string>
-    <string name="msg_strings_not_found">Not found in app resources (skipped): %1$s</string>    <string name="inspector_title">APK Inspector</string>
-    <string name="insp_type_normal">✔ Standard app — all tools available</string>
-    <string name="insp_type_compose">⚠ Jetpack Compose — menu item hiding is not available</string>
-    <string name="insp_type_flutter">⚠ Flutter (Dart) — menu item hiding is not available</string>
-    <string name="insp_ads">💰 Ads: %1$s</string>
-    <string name="insp_analytics">📊 Analytics: %1$s</string>
-    <string name="insp_none">none found</string>
-    <string name="insp_locales">🌍 Languages (%1$d): %2$s</string>
-    <string name="insp_ru_yes">✔ Russian present — translation not needed</string>
-    <string name="insp_ru_no">✖ No Russian — you can translate (Translate app)</string>
-    <string name="insp_found">🎯 Found: %1$s</string>
-    <string name="insp_found_none">🎯 Nothing typical found</string>    <string name="remove_update_check">Remove update check (Play, RuStore)</string>
-    <string name="log_update_check">🔓 Update check (Play): %1$d</string>
-    <string name="log_update_not_found_norebuild">❌ Update check (Play) not found — the file was not rebuilt</string>    <string name="insp_update_check">🔔 Update check: %1$s</string>
-    <string name="tools_title">Tools</string>
-    <string name="tools_signature_section">🔑 Create signature</string>
-    <string name="tools_signature_desc">Here you can create your own signature file (keystore) to sign modified APKs.\n\nWhy it matters: Android only installs signed apps. After patching, the APK must be signed again with your own key. Note: an installed app can only be updated with the same key — keep the signature file and password safe.</string>
-    <string name="tools_create_signature">Create signature</string>
+<resources>
+
+    <string name="app_name">Lazy Modification</string>
+
+
+
+    <!-- Main screen -->
+
+    <string name="settings">Settings</string>
+
+    <string name="convert_apks">Convert APKs</string>
+
+    <string name="extract_apk">Extract APK</string>
+
+    <string name="split_apk">Split APK</string>
+
+    <string name="clone_apk">Clone APK</string>
+
+    <string name="apk_operations">APK Operations</string>
+
+    <string name="general_edit">General editing</string>
+
+    <string name="modify_app_interface">Modify app interface</string>
+
+    <string name="patching">Patching</string>
+
+    <string name="exit">Exit</string>
+
+
+
+    <!-- Settings menu -->
+
+    <string name="toggle_theme">Toggle theme</string>
+
+    <string name="sort">Sort</string>
+
+    <string name="sort_by_name">By name</string>
+
+    <string name="sort_by_date">By modification date</string>
+
+    <string name="sort_by_size">By size</string>
+
+    <string name="signature">Signature</string>
+
+    <string name="language">Language</string>
+
+    <string name="lang_ru">Русский</string>
+
+    <string name="lang_en">English</string>
+
+
+
+    <!-- Common -->
+
+    <string name="file_not_selected">File: not selected</string>
+
+    <string name="back">Back</string>
+
+    <string name="apply">Apply</string>
+
+    <string name="edit">Edit</string>
+
+    <string name="install">Install</string>
+
+    <string name="save">Save</string>
+
+    <string name="close">Close</string>
+
+    <string name="app_icon">App icon</string>
+
+    <string name="name">Name</string>
+
+    <string name="version">Version</string>
+
+    <string name="build_number">Build number</string>
+
+
+
+    <!-- Cloning -->
+
+    <string name="clone_apk_title">Clone APK</string>
+
+    <string name="clone">Clone</string>
+
+    <string name="package_name_label">Package name:</string>
+
+    <string name="package_suffix_hint">⚠️ You can only change the last 3 characters of the package</string>
+
+
+
+    <!-- Conversion -->
+
+    <string name="choose_file_apks_xapk">Choose file (.apks/.xapk)</string>
+
+
+
+    <!-- APK editing -->
+
+    <string name="min_sdk_version">Minimum SDK version</string>
+
+    <string name="target_sdk_version">Target SDK version</string>
+
+    <string name="remove_internet_access">Remove internet access</string>
+
+    <string name="disable_internet">Disable internet</string>
+
+    <string name="disable_direct_boot">Disable Direct Boot</string>
+
+    <string name="disable_autostart">Disable autostart on boot</string>
+
+    <string name="disable_autostart_short">Disable autostart</string>
+
+    <string name="fix_google_maps">Fix Google Maps</string>
+
+    <string name="convert_for_atv">Convert for ATV</string>
+
+
+
+    <!-- Extraction -->
+
+    <string name="user_apps">User apps</string>
+
+    <string name="loading_list">Loading list...</string>
+
+
+
+    <!-- Interface modification -->
+
+    <string name="interface_modify">Interface modification</string>
+
+    <string name="remove_menu_items">Remove menu items</string>
+
+    <string name="insert_marquee">Insert marquee</string>
+
+    <string name="enter_menu_items_to_remove">Enter menu item names to remove:</string>
+
+    <string name="add_item">+ Add item</string>
+
+
+
+    <!-- Log -->
+
+    <string name="patching_log">Patching log</string>
+
+
+
+    <!-- Patching -->
+
+    <string name="patching_apk">Patch APK</string>
+
+    <string name="remove_google_play_redirect">Remove Google Play redirect</string>
+
+    <string name="remove_ads_calls">Remove ad calls</string>
+
+    <string name="remove_analytics">Remove analytics</string>
+
+    <string name="remove_gp_services">Remove GP services</string>
+
+    <string name="remove_vpn_detection">Remove VPN detection</string>
+
+    <string name="remove_locale_packages">Remove locale packages</string>
+
+    <string name="remove_dpi_duplicates">Remove duplicate graphics (DPI)</string>
+
+    <string name="remove_libs_archs">Remove libraries (architectures)</string>
+
+    <string name="optimize">Optimize (reduce size)</string>
+
+    <string name="start_patching">Start patching</string>
+
+
+
+    <!-- Split APK -->
+
+    <string name="choose_architectures">Choose architectures:</string>
+
+    <string name="split">Split</string>
+
+
+
+    <string name="status_insert_marquee">⏳ Inserting marquee...</string>
+
+    <string name="status_cloning">⏳ Cloning...</string>
+
+    <string name="status_processing">⏳ Processing...</string>
+
+    <string name="status_preparing">⏳ Preparing...</string>
+
+    <string name="status_searching_launcher">⏳ Searching for launcher activity...</string>
+
+    <string name="status_saving">⏳ Saving...</string>
+
+    <string name="status_removing_menu">⏳ Removing menu items...</string>
+
+    <string name="status_reading_dpi_apk">⏳ Reading DPI from APK...</string>
+
+    <string name="status_reading_dpi">⏳ Reading DPI...</string>
+
+    <string name="status_reading_archs_apk">⏳ Reading architectures from APK...</string>
+
+    <string name="status_reading_archs">⏳ Reading architectures...</string>
+
+    <string name="status_reading_package">⏳ Reading package...</string>
+
+    <string name="status_reading_locales_apk">⏳ Reading languages from APK...</string>
+
+    <string name="status_reading_locales">⏳ Reading languages...</string>
+
+    <string name="done">✅ Done!</string>
+
+    <string name="icon_selected">✅ Icon selected. You can save now.</string>
+
+    <string name="signed_preserved_signinfo">✅ Original signature data saved</string>
+
+    <string name="signed">✅ Signed</string>
+
+    <string name="err_keystore_not_selected">❌ Keystore not selected</string>
+
+    <string name="oom_apk_too_large">❌ OutOfMemoryError: APK too large to process</string>
+
+    <string name="enter_package_name">❌ Enter package name</string>
+
+    <string name="enter_new_chars">❌ Enter new characters</string>
+
+    <string name="enter_at_least_one_menu_item">❌ Enter at least one menu item</string>
+
+    <string name="choose_apk_file">❌ Choose an .apk file</string>
+
+    <string name="choose_png_file">❌ Choose a PNG file</string>
+
+    <string name="choose_at_least_one_option">❌ Choose at least one option</string>
+
+    <string name="launcher_not_found">❌ Launcher activity not found</string>
+
+    <string name="package_name_too_short">❌ Package name too short</string>
+
+    <string name="apk_read_failed">❌ Failed to read APK</string>
+
+    <string name="err_keystore_read_failed">❌ Failed to read keystore</string>
+
+    <string name="unknown_source_path">❌ Unknown source file path</string>
+
+    <string name="oom">❌ Out of memory</string>
+
+    <string name="oom_file_too_large">❌ Out of memory: file too large. Try a smaller APK.</string>
+
+    <string name="error">❌ Error</string>
+
+    <string name="invalid_file">❌ Error: invalid file</string>
+
+    <string name="apk_path_not_set">❌ APK path not set</string>
+
+    <string name="storage_permission_denied">❌ File access permission not granted</string>
+
+    <string name="install_permission_denied">❌ Install permission not granted</string>
+
+    <string name="permission_denied">❌ Permission not granted</string>
+
+    <string name="apk_file_not_found">❌ APK file not found</string>
+
+    <string name="apk_file_not_exists">❌ APK file does not exist</string>
+
+    <string name="testkey_not_found">❌ testkey.p12 not found in assets</string>
+
+    <string name="file_not_selected_err">❌ File not selected</string>
+
+    <string name="not_apks_xapk">❌ File not found or not .apks/.xapk</string>
+
+    <string name="file_not_exists">❌ File does not exist</string>
+
+    <string name="file_not_specified">❌ File not specified</string>
+
+    <string name="patched_apk_not_found">❌ Patched APK file not found</string>
+
+    <string name="file_too_large">❌ File too large to process on this device</string>
+
+    <string name="dpi_not_selected">⚠️ No DPI selected</string>
+
+    <string name="dpi_not_found">⚠️ No DPI found</string>
+
+    <string name="dpi_files_not_found">⚠️ DPI files not found</string>
+
+    <string name="archs_not_selected">⚠️ No architectures selected</string>
+
+    <string name="archs_not_found">⚠️ No architectures found</string>
+
+    <string name="libs_not_found">⚠️ No libraries found</string>
+
+    <string name="choose_at_least_one_arch">⚠️ Choose at least one architecture</string>
+
+    <string name="signature_conflict">⚠️ Signature conflict</string>
+
+    <string name="locales_not_found">⚠️ No localizations found</string>
+
+    <string name="manifest_nothing_found">⚠️ Manifest: nothing found</string>
+
+    <string name="no_option_selected">⚠️ No option selected</string>
+
+    <string name="app_not_removed">⚠️ App was not removed</string>
+
+    <string name="app_not_removed_install_cancelled">⚠️ App was not removed. Installation cancelled.</string>
+
+    <string name="allow_unknown_sources">⚠️ Allow installation from unknown sources</string>
+
+    <string name="marquee_settings">⚙️ Marquee settings</string>
+
+    <string name="three_times">3 times</string>
+
+    <string name="keystore_not_selected">Keystore not selected</string>
+
+    <string name="white">White</string>
+
+    <string name="infinite">Infinite</string>
+
+    <string name="libs_will_be_removed">Libraries of the selected architectures will be removed from the APK:</string>
+
+    <string name="enter_new_package_name">Enter new package name:</string>
+
+    <string name="enter_menu_item_text">Enter menu item text</string>
+
+    <string name="top">Top</string>
+
+    <string name="all_files">All files</string>
+
+    <string name="light_blue">Light blue</string>
+
+    <string name="yellow">Yellow</string>
+
+    <string name="green">Green</string>
+
+    <string name="apks_conversion_done">APKS conversion complete</string>
+
+    <string name="xapk_conversion_done">XAPK conversion complete</string>
+
+    <string name="red">Red</string>
+
+    <string name="keystore_read_failed">Failed to read keystore</string>
+
+    <string name="bottom">Bottom</string>
+
+    <string name="new_package_name">New package name</string>
+
+    <string name="ok">OK</string>
+
+    <string name="orange">Orange</string>
+
+    <string name="cancel_upper">CANCEL</string>
+
+    <string name="patching_apk_progress">Patching APK...</string>
+
+    <string name="repetitions">Repetitions:</string>
+
+    <string name="signature_saved">Signature saved</string>
+
+    <string name="user_apps_not_found">No user apps found</string>
+
+    <string name="text_size_sp">Text size (sp)</string>
+
+    <string name="position">Position:</string>
+
+    <string name="pink">Pink</string>
+
+    <string name="patching_service">APK patching service</string>
+
+    <string name="middle">Middle</string>
+
+    <string name="gray">Gray</string>
+
+    <string name="blue">Blue</string>
+
+    <string name="marquee_text">Marquee text</string>
+
+    <string name="uninstall_and_install">Uninstall and install</string>
+
+    <string name="uninstall_and_install_question">Uninstall and install the patched version?</string>
+
+    <string name="file_not_found">File not found</string>
+
+    <string name="browser_empty">No files found</string>
+
+    <string name="purple">Purple</string>
+
+    <string name="install_modified_question">Install the modified app?</string>
+
+    <string name="text_color">Text color:</string>
+
+    <string name="black">Black</string>
+
+    <string name="choose_locales">🌍 Choose languages to remove</string>
+
+    <string name="status_removing_locales">🌍 Removing localizations...</string>
+
+    <string name="choose_archs">🏗️ Choose architectures to remove</string>
+
+    <string name="status_removing_libs">🏗️ Removing libraries...</string>
+
+    <string name="no_files_access">📁 No access to files or folder is empty</string>
+
+    <string name="status_copying_apk">📋 Copying APK...</string>
+
+    <string name="status_zipalign">📐 Aligning (ZipAlign)...</string>
+
+    <string name="status_patching_manifest">📜 Patching AndroidManifest.xml...</string>
+
+    <string name="status_extracting_dex">📦 Extracting DEX...</string>
+
+    <string name="status_repacking">📦 Repacking...</string>
+
+    <string name="old_removed_installing_patched">📦 Old app removed. Installing patched...</string>
+
+    <string name="old_removed_installing">📦 Old app removed. Installing...</string>
+
+    <string name="install_question">📦 Install app?</string>
+
+    <string name="choose_dpi">📱 Choose DPI to remove</string>
+
+    <string name="status_removing_dpi">📱 Removing DPI graphics...</string>
+
+    <string name="status_signing_apk">🔐 Signing APK...</string>
+
+    <string name="status_signing">🔐 Signing...</string>
+
+    <string name="original_signature_preserved">🔑 Original signature data saved</string>
+
+    <string name="saving_original_signature">🔑 Saving original signature</string>
+
+    <string name="saving_original_signature_progress">🔑 Saving original signature...</string>
+
+    <string name="temp_files_removed">🗑️ Temporary files removed</string>
+
+    <string name="status_cleaning_kotlin">🧹 Cleaning kotlin/ and metadata...</string>
+
+
+
+    <string name="file_label">File: %1$s</string>
+
+    <string name="error_with_msg">❌ Error: %1$s</string>
+
+    <string name="error_msg_plain">Error: %1$s</string>
+
+    <string name="install_error_msg">❌ Install error: %1$s</string>
+
+    <string name="uninstall_error_msg">❌ Uninstall error: %1$s</string>
+
+    <string name="log_save_error_msg">❌ Log save error: %1$s</string>
+
+    <string name="launch_error_msg">❌ Launch error: %1$s</string>
+
+    <string name="extracting_app">⏳ Extracting %1$s...</string>
+
+    <string name="edit_title">Edit: %1$s</string>
+
+    <string name="launcher_found">✅ Launcher activity: %1$s</string>
+
+    <string name="marquee_settings_saved">✅ Settings: «%1$s...»</string>
+
+    <string name="creating_apk_for">⏳ Creating APK for %1$s...</string>
+
+    <string name="saved_to_downloads">✅ Saved: %1$s\n📁 %2$s</string>
+
+    <string name="cloned_success">✅ Cloned!\n📦 New package: %1$s\n%2$s\n📁 %3$s/%4$s</string>
+
+    <string name="cloned_success_fb">✅ Cloned!\n Package: %1$s\n%2$s\n %3$s</string>
+
+    <string name="saved_success">✅ Saved: %1$s\n%2$s\n📁 %3$s</string>
+
+    <string name="done_success">✅ Done!\n📁 %1$s/%2$s\n%3$s</string>
+
+    <string name="log_saved_success">✅ Log saved:\n%1$s</string>
+
+    <string name="created_success">✅ Created:\n%1$s\n\n%2$s</string>
+
+    <string name="log_locales_selected">🌍 Locales selected: %1$d</string>
+
+    <string name="log_dpi_selected">📱 DPI selected: %1$s</string>
+
+    <string name="log_archs_selected">🏗️ Architectures to remove: %1$s</string>
+
+    <string name="log_signature">🔐 Signature: %1$s</string>
+
+    <string name="log_manifest_removed">✅ Manifest: %1$d components removed</string>
+
+    <string name="log_manifest_error">⚠️ Manifest: %1$s</string>
+
+    <string name="log_locales_removed">✅ Locales removed: %1$d</string>
+
+    <string name="log_locales_error">⚠️ Localizations: %1$s</string>
+
+    <string name="log_dpi_removed">✅ DPI files removed: %1$d</string>
+
+    <string name="log_dpi_error">⚠️ DPI: %1$s</string>
+
+    <string name="log_libs_removed">✅ Libraries removed: %1$d</string>
+
+    <string name="log_libs_error">⚠️ Libraries: %1$s</string>
+
+    <string name="log_dex_count">✅ DEX: %1$d files</string>
+
+    <string name="log_oom_dex">❌ OOM on %1$s (%2$s MB). File too large.</string>
+
+    <string name="log_ads">✅ Ads: %1$d</string>
+
+    <string name="log_analytics">✅ Analytics: %1$d</string>
+
+    <string name="log_gp_services">✅ GP Services: %1$d</string>
+
+    <string name="log_debug">✅ Debug info: %1$d items removed</string>
+
+    <string name="log_kept_removed">✅ Kept: %1$d | Removed: %2$d</string>
+
+    <string name="log_cleanup_error">⚠️ Cleanup: %1$s</string>
+
+    <string name="log_sign_error">❌ Signing: %1$s</string>
+
+    <string name="log_saving">💾 Saving: %1$s</string>
+
+    <string name="log_done_in_ms">✅ Done in %1$dms</string>
+
+    <string name="sig_mismatch_part1">App «%1$s» is already installed with a different signature.\n\n</string>
+
+    <string name="sig_mismatch_part2">To install the patched version, first uninstall the installed app.\n\n</string>
+
+    <string name="split_apk_files">📦 Split APK (%1$d files)</string>
+
+    <string name="log_start">🚀 Start: %1$s (%2$s MB)</string>
+
+    <string name="log_copied_mb">✅ Copied: %1$s MB</string>
+
+    <string name="log_repacked_mb">✅ Repacked: %1$s MB</string>
+
+    <string name="log_signed_mb">✅ Signed: %1$s MB</string>
+
+    <string name="unknown">unknown</string>
+
+    <string name="log_apk_prepared">📦 APK prepared for install (package: %1$s)</string>
+
+    <string name="cancel">Cancel</string>
+
+    <string name="cloning">Cloning</string>
+
+    <string name="log_custom_signature">🔑 Custom signature V1=%1$s, V2=%2$s, V3=%3$s</string>
+
+    <string name="signing_v1_label">V1 (JAR) signature</string>
+
+    <string name="signing_v2_label">V2 signature</string>
+
+    <string name="signing_v3_label">V3 signature</string>
+
+    <string name="signing_no_sign">⛔ Do not sign APK (preserve original signature)</string>
+
+    <string name="signing_custom_keystore">🔑 Custom keystore</string>
+
+    <string name="signing_options_title">🔐 APK signing options</string>
+
+    <string name="signing_options_message">Choose signing schemes for the resulting APK:</string>
+
+    <string name="signing_choose_scheme">⚠️ Choose at least one signing scheme</string>
+
+    <string name="use">Use</string>
+
+    <string name="choose_another">Choose another</string>
+
+    <string name="keystore_type_label">Keystore type:</string>
+
+    <string name="keystore_type_pkcs12">PKCS12 (.p12/.pfx)</string>
+
+    <string name="keystore_type_jks">JKS (.jks/.keystore)</string>
+
+    <string name="keystore_password_hint">Keystore password</string>
+
+    <string name="key_alias_hint">Key alias</string>
+
+    <string name="key_password_hint">Key password (if different)</string>
+
+    <string name="sign_confirm">Sign</string>
+
+    <string name="signing_password_alias_empty">❌ Password and alias cannot be empty</string>
+
+    <string name="none">none</string>
+
+    <string name="keystore_file_message">File: %1$s\nEnter keystore data:</string>
+
+    <string name="keystore_type_auto">ℹ️ Type detected automatically: %1$s</string>
+
+    <string name="keystore_alias_not_found">❌ Alias «%1$s» not found. Available: %2$s</string>
+
+    <string name="keystore_error">❌ Keystore error: %1$s</string>
+
+    <string name="use_saved_keystore_question">Use saved signature?\n\n</string>
+
+    <string name="file_with_newline">File: %1$s\n</string>
+
+    <string name="alias_with_newline">Alias: %1$s\n</string>
+
+    <string name="type_label">Type: %1$s</string>    <string name="save_folder">Save folder</string>
+
+    <string name="choose_folder">Choose folder</string>
+
+    <string name="default_folder">Default</string>
+
+    <string name="save_folder_set">Save folder: %1$s</string>
+
+    <string name="save_folder_reset">Using default folder (Download/LazyModification)</string>
+
+    <string name="remove_installer_check">Remove installer check</string>
+
+    <string name="lang_bg">Български</string>
+
+    <string name="compare_apk">Compare APK</string>
+
+    <string name="compare_axml">Compare Axml</string>
+
+    <string name="compare_dex">Compare Dex</string>
+
+    <string name="compare_dex_result_title">Comparison</string>
+
+    <string name="comparing_dex">Comparing...</string>
+
+    <string name="compare_no_differences">No differences found</string>
+
+    <string name="compare_classes_only_1">Classes only in APK 1</string>
+
+    <string name="compare_classes_only_2">Classes only in APK 2</string>
+
+    <string name="compare_strings_only_1">Strings only in APK 1</string>
+
+    <string name="compare_strings_only_2">Strings only in APK 2</string>
+
+    <string name="select_option">Select at least one option</string>
+
+    <string name="coming_soon">Coming soon</string>
+
+    <string name="compare_apk1_label">APK 1: %1$s</string>
+
+    <string name="compare_apk2_label">APK 2: %1$s</string>
+
+    <string name="compare_diff_count">Differences: %1$d</string>
+
+    <string name="compare_truncated">not all differences shown</string>
+
+    <string name="compare_changed_files">Changed files: %1$d</string>
+
+    <string name="compare_apk1">APK 1</string>
+
+    <string name="compare_apk2">APK 2</string>
+
+    <string name="ignore_debug_info">Ignore debug info</string>
+
+    <string name="ignore_nop">Ignore nop instructions</string>
+
+    <string name="compare_options">Comparison options</string>
+
+    <string name="compare_legend">blue — changed · red — removed · green — added</string>
+
+    <string name="ignore_ad_calls">Ignore ad calls</string>
+
+    <string name="ignore_analytics">Ignore analytics</string>
+
+    <string name="option_not_available">This option is not available to you</string>
+
+    <string name="locale_bho">Bhojpuri</string>
+
+
+    <string name="locale_ceb">Cebuano</string>
+
+
+    <string name="locale_ckb">Central Kurdish (Sorani)</string>
+
+
+    <string name="locale_doi">Dogri</string>
+
+
+    <string name="locale_fil">Filipino</string>
+
+
+    <string name="locale_haw">Hawaiian</string>
+
+
+    <string name="locale_hmn">Hmong</string>
+
+
+    <string name="locale_ilo">Ilocano</string>
+
+
+    <string name="locale_jw">Javanese</string>
+
+
+    <string name="locale_kri">Krio</string>
+
+
+    <string name="locale_lus">Mizo (Lushai)</string>
+
+
+    <string name="locale_mai">Maithili</string>
+
+
+    <string name="locale_nso">Northern Sotho (Sepedi)</string>
+
+
+    <string name="err_app_flutter">This is a Flutter (Dart) app: the menu is built in code — automatic item removal is not possible.</string>
+
+    <string name="err_app_compose">This is a Jetpack Compose app: items are built in code — automatic removal is not possible.</string>    <string name="translate_app_button">Translate app</string>
+
+    <string name="translator_label">Translator:</string>
+
+    <string name="translator_google">Google</string>
+
+    <string name="translator_mymemory">MyMemory</string>
+
+    <string name="translator_azure">Azure Translator</string>
+
+    <string name="translator_deepl">DeepL Free</string>
+
+    <string name="azure_key_hint">Azure Translator key</string>
+
+    <string name="azure_region_hint">Azure region (e.g. westeurope)</string>
+
+    <string name="deepl_key_hint">DeepL key</string>
+
+    <string name="start_translate">Start translation</string>
+
+    <string name="status_preparing_strings">Preparing strings…</string>
+
+    <string name="status_translating">Translating: %1$d of %2$d…</string>
+
+    <string name="translations_preview">Preview: %1$d strings</string>
+
+    <string name="apply_translations">Apply translation</string>
+
+    <string name="err_translator_key_required">Enter the key for the selected translator</string>
+
+    <string name="err_translate_empty">No strings found to translate</string>
+
+    <string name="err_translate_failed">Translation error: %1$s</string>
+
+    <string name="translations_applied">✅ Translations applied (Russian locale)</string>
+
+    <string name="status_translations_write">Writing Russian locale…</string>
+
+    <string name="preview_truncated">…showing first %1$d strings</string>    <string name="translations_edit_hint">You can edit translations directly in the list</string>    <string name="mode_label">Mode:</string>
+
+    <string name="mode_fast">Quick translation</string>
+
+    <string name="mode_full">Full translation</string>
+
+    <string name="fast_strings_hint">Strings to translate, comma-separated</string>
+
+    <string name="fast_strings_note">Comma-separated. Translator: MyMemory.</string>
+
+    <string name="fast_translate_action">Translate</string>
+
+    <string name="err_fast_empty">Enter strings to translate, comma-separated</string>
+
+    <string name="msg_strings_not_found">Not found in app resources (skipped): %1$s</string>    <string name="inspector_title">APK Inspector</string>
+
+    <string name="insp_type_normal">✔ Standard app — all tools available</string>
+
+    <string name="insp_type_compose">⚠ Jetpack Compose — menu item hiding is not available</string>
+
+    <string name="insp_type_flutter">⚠ Flutter (Dart) — menu item hiding is not available</string>
+
+    <string name="insp_ads">💰 Ads: %1$s</string>
+
+    <string name="insp_analytics">📊 Analytics: %1$s</string>
+
+    <string name="insp_none">none found</string>
+
+    <string name="insp_locales">🌍 Languages (%1$d): %2$s</string>
+
+    <string name="insp_ru_yes">✔ Russian present — translation not needed</string>
+
+    <string name="insp_ru_no">✖ No Russian — you can translate (Translate app)</string>
+
+    <string name="insp_found">🎯 Found: %1$s</string>
+
+    <string name="insp_found_none">🎯 Nothing typical found</string>    <string name="remove_update_check">Remove update check (Play, RuStore)</string>
+
+    <string name="log_update_check">🔓 Update check (Play): %1$d</string>
+
+    <string name="log_update_not_found_norebuild">❌ Update check (Play) not found — the file was not rebuilt</string>    <string name="insp_update_check">🔔 Update check: %1$s</string>
+
+    <string name="tools_title">Tools</string>
+
+    <string name="tools_signature_section">🔑 Create signature</string>
+
+    <string name="tools_signature_desc">Here you can create your own signature file (keystore) to sign modified APKs.\n\nWhy it matters: Android only installs signed apps. After patching, the APK must be signed again with your own key. Note: an installed app can only be updated with the same key — keep the signature file and password safe.</string>
+
+    <string name="tools_create_signature">Create signature</string>
+
     <string name="sign_apk_title">Sign APK</string>
     <string name="sign_apk_action">Sign APK</string>
     <string name="sign_apk_signing">⏳ Signing APK…</string>
     <string name="sign_apk_done">✅ APK signed: %1$s</string>
     <string name="sign_apk_failed">❌ Signing error: %1$s</string>
-    <string name="tools_signature_note">🔒 The signature file and passwords never leave your device — everything is generated locally.</string>
-    <string name="sig_create_title">🔑 Create signature</string>
-    <string name="sig_intro">Fill in the signature details. Explanations are shown under each field.</string>
-    <string name="sig_field_file">File name</string>
-    <string name="sig_field_file_desc">Name of the signature file. It will be saved to the output folder (Download/LazyModification by default).</string>
-    <string name="sig_field_alias">Key alias</string>
-    <string name="sig_field_alias_desc">Internal key name inside the keystore. You will need it when signing — remember it.</string>
-    <string name="sig_field_store_pass">Keystore password</string>
-    <string name="sig_field_store_pass_desc">Protects the signature file. Remember it — it cannot be recovered.</string>
-    <string name="sig_field_key_pass">Key password (optional)</string>
-    <string name="sig_field_key_pass_desc">Leave empty to use the keystore password.</string>
-    <string name="sig_field_years">Validity, years</string>
-    <string name="sig_field_years_desc">30 years is recommended: Google Play requires the signing key to remain valid for at least 25 years.</string>
-    <string name="sig_field_cn">Owner (CN)</string>
-    <string name="sig_field_cn_desc">Any owner name for the certificate (for example, a nickname). It is visible in the signature details.</string>
-    <string name="sig_default_name">my_signature</string>
-    <string name="sig_default_alias">mykey</string>
-    <string name="sig_default_years">30</string>
-    <string name="sig_default_cn">LazyModification</string>
-    <string name="sig_action_create">Create</string>
-    <string name="sig_creating">⏳ Creating signature…</string>
-    <string name="sig_created_title">✅ Signature created</string>
-    <string name="sig_created_msg">File: %1$s\nFolder: %2$s\nAlias: %3$s\n\nHow to use: menu ⚙ → “Signature” → “Custom signature” → select this file, enter the password and alias. All APKs will then be signed with your key.</string>
-    <string name="sig_create_error">❌ Failed to create signature: %1$s</string>
-    <string name="sig_err_name">❌ Enter the file name</string>
-    <string name="sig_err_alias">❌ Enter the key alias</string>
-    <string name="sig_err_pass">❌ Keystore password cannot be empty</string>
-    <string name="sig_err_years">❌ Validity: enter a number from 1 to 100</string>
-    <string name="sig_field_type">Keystore type</string>
-    <string name="sig_type_desc">PKCS12 is the modern format (recommended). JKS is the legacy Java format (for older tools).</string>
-    <string name="convert_nosign_warning_title">⚠️ Signature</string>
-    <string name="convert_nosign_warning">The original signature cannot be preserved when converting APKS/XAPK: modern files are signed with V2/V3 schemes, which stop being valid after the splits are merged.\n\nThe output will have NO signature — tools (e.g. “Remove signature verification” in MT Manager) will not accept it.\n\nIt is recommended to sign the file with your own key.</string>
-    <string name="convert_nosign_sign_button">Sign with my key</string>
-    <string name="convert_nosign_continue">Continue without signature</string>
-    <string name="original_signature_not_saved">⚠️ The original signature was not preserved — the source has no V1 signature. The file is unsigned: sign it with your own key before further processing.</string>
-    <string name="log_signature_kill_start">🛡️ Removing signature verification: engine injection...</string>
-    <string name="log_signature_kill_ok">🛡️ Signature verification disabled (engine injected)</string>
-    <string name="log_signature_kill_fail">❌ Signature removal failed: %1$s</string>
-    <string name="tools_kill_section">🛡️ Signature verification</string>
-    <string name="tools_kill_desc">Injects an engine that disables signature checks (result-compatible with MT Manager). Pick an APK that carries the original signature — the app will launch even with a changed signature.</string>
-    <string name="tools_kill_button">Remove signature verification</string>
-    <string name="tools_kill_note">ℹ️ Requires a file with the original signature (original app or built with preserved signature). After processing, sign the APK as usual.</string>
-    <string name="allow_screenshots">Allow screenshots</string>
-    <string name="tools_dex_editor">Dex Editor</string>
-    <string name="dex_editor_title">DEX editor</string>
-    <string name="dex_editor_search_hint">Search class…</string>
-    <string name="dex_editor_loading">Reading dex…</string>
-    <string name="dex_editor_classes_found">Classes: %1$d</string>
-    <string name="dex_editor_no_methods">No stubbable methods in this class</string>
-    <string name="dex_editor_stub_title">Stub this method with?</string>
-    <string name="dex_editor_warn">The stub disables the method entirely. Be careful with important methods — the app may break.</string>
-    <string name="dex_editor_confirm">Stub %1$s → %2$s?</string>
-    <string name="dex_editor_added">Added: %1$s → %2$s (queued: %3$d)</string>
-    <string name="dex_editor_already">This method is already queued</string>
-    <string name="dex_editor_apply">Apply (%1$d)</string>
-    <string name="dex_editor_clear">Clear queue</string>
-    <string name="dex_editor_queue_hint">Queued edits: %1$d</string>
-    <string name="stub_log_result">✅ Methods stubbed: %1$d (not found: %2$d)</string>    <string name="dex_editor_mode_class">Classes</string>
-    <string name="dex_editor_mode_method">Methods</string>
-    <string name="dex_editor_mode_string">Strings</string>
-    <string name="dex_editor_search_method_hint">Search method…</string>
-    <string name="dex_editor_search_string_hint">Search string in code…</string>
-    <string name="dex_editor_indexing">Indexing methods…</string>
-    <string name="dex_editor_searching">Searching…</string>
-    <string name="dex_editor_searching_progress">Searching… (%1$d/%2$d)</string>
-    <string name="dex_editor_found">Found: %1$d</string>
-    <string name="dex_editor_not_found">Nothing found</string>    <string name="dex_editor_no_pkg">(no package)</string>
-    <string name="code_title">Method code</string>
-    <string name="code_edit_title">Edit instruction</string>
-    <string name="code_edit_warn">You can replace it with any instruction of the same size (including a different opcode): registers, values, references. The size cannot change.</string>
-    <string name="code_edits_n">edits: %1$d</string>
-    <string name="dex_editor_replace_added">Code edits added: %1$d</string>
-    <string name="replace_log_result">✅ Code edits: %1$d (of %2$d)</string>
-    <string name="code_not_found">Method not found</string>    <string name="code_menu_title">Instruction</string>
-    <string name="code_menu_goto">Go to method</string>
-    <string name="code_copy_line">Copy line</string>
-    <string name="code_copy_all">Copy whole method</string>
-    <string name="copy_done">Copied</string>
-    <string name="code_clear_btn">Clear method</string>
-    <string name="code_clear_title">Clear method?</string>
-    <string name="code_clear_warn">The method code will be replaced with a return of the selected value. Be careful with important methods.</string>
-    <string name="code_clear_done">Method will be cleared: %1$s</string>
-    <string name="code_clear_state">clearing: %1$s</string>
-    <string name="code_clear_cancelled">Method clearing cancelled</string>    <string name="search_history_title">Saved queries</string>
-    <string name="search_history_empty">No saved queries</string></resources>
+    <string name="tools_signature_note">🔒 The signature file and passwords never leave your device — everything is generated locally.</string>
+
+    <string name="sig_create_title">🔑 Create signature</string>
+
+    <string name="sig_intro">Fill in the signature details. Explanations are shown under each field.</string>
+
+    <string name="sig_field_file">File name</string>
+
+    <string name="sig_field_file_desc">Name of the signature file. It will be saved to the output folder (Download/LazyModification by default).</string>
+
+    <string name="sig_field_alias">Key alias</string>
+
+    <string name="sig_field_alias_desc">Internal key name inside the keystore. You will need it when signing — remember it.</string>
+
+    <string name="sig_field_store_pass">Keystore password</string>
+
+    <string name="sig_field_store_pass_desc">Protects the signature file. Remember it — it cannot be recovered.</string>
+
+    <string name="sig_field_key_pass">Key password (optional)</string>
+
+    <string name="sig_field_key_pass_desc">Leave empty to use the keystore password.</string>
+
+    <string name="sig_field_years">Validity, years</string>
+
+    <string name="sig_field_years_desc">30 years is recommended: Google Play requires the signing key to remain valid for at least 25 years.</string>
+
+    <string name="sig_field_cn">Owner (CN)</string>
+
+    <string name="sig_field_cn_desc">Any owner name for the certificate (for example, a nickname). It is visible in the signature details.</string>
+
+    <string name="sig_default_name">my_signature</string>
+
+    <string name="sig_default_alias">mykey</string>
+
+    <string name="sig_default_years">30</string>
+
+    <string name="sig_default_cn">LazyModification</string>
+
+    <string name="sig_action_create">Create</string>
+
+    <string name="sig_creating">⏳ Creating signature…</string>
+
+    <string name="sig_created_title">✅ Signature created</string>
+
+    <string name="sig_created_msg">File: %1$s\nFolder: %2$s\nAlias: %3$s\n\nHow to use: menu ⚙ → “Signature” → “Custom signature” → select this file, enter the password and alias. All APKs will then be signed with your key.</string>
+
+    <string name="sig_create_error">❌ Failed to create signature: %1$s</string>
+
+    <string name="sig_err_name">❌ Enter the file name</string>
+
+    <string name="sig_err_alias">❌ Enter the key alias</string>
+
+    <string name="sig_err_pass">❌ Keystore password cannot be empty</string>
+
+    <string name="sig_err_years">❌ Validity: enter a number from 1 to 100</string>
+
+    <string name="sig_field_type">Keystore type</string>
+
+    <string name="sig_type_desc">PKCS12 is the modern format (recommended). JKS is the legacy Java format (for older tools).</string>
+
+    <string name="convert_nosign_warning_title">⚠️ Signature</string>
+
+    <string name="convert_nosign_warning">The original signature cannot be preserved when converting APKS/XAPK: modern files are signed with V2/V3 schemes, which stop being valid after the splits are merged.\n\nThe output will have NO signature — tools (e.g. “Remove signature verification” in MT Manager) will not accept it.\n\nIt is recommended to sign the file with your own key.</string>
+
+    <string name="convert_nosign_sign_button">Sign with my key</string>
+
+    <string name="convert_nosign_continue">Continue without signature</string>
+
+    <string name="original_signature_not_saved">⚠️ The original signature was not preserved — the source has no V1 signature. The file is unsigned: sign it with your own key before further processing.</string>
+
+    <string name="log_signature_kill_start">🛡️ Removing signature verification: engine injection...</string>
+
+
+    <string name="log_signature_kill_ok">🛡️ Signature verification disabled (engine injected)</string>
+
+
+    <string name="log_signature_kill_fail">❌ Signature removal failed: %1$s</string>
+
+
+    <string name="tools_kill_section">🛡️ Signature verification</string>
+
+
+    <string name="tools_kill_desc">Injects an engine that disables signature checks (result-compatible with MT Manager). Pick an APK that carries the original signature — the app will launch even with a changed signature.</string>
+
+
+    <string name="tools_kill_button">Remove signature verification</string>
+
+
+    <string name="tools_kill_note">ℹ️ Requires a file with the original signature (original app or built with preserved signature). After processing, sign the APK as usual.</string>
+
+
+    <string name="allow_screenshots">Allow screenshots</string>
+
+
+    <string name="tools_dex_editor">Dex Editor</string>
+
+
+    <string name="dex_editor_title">DEX editor</string>
+
+
+    <string name="dex_editor_search_hint">Search class…</string>
+
+
+    <string name="dex_editor_loading">Reading dex…</string>
+
+
+    <string name="dex_editor_classes_found">Classes: %1$d</string>
+
+
+    <string name="dex_editor_no_methods">No stubbable methods in this class</string>
+
+
+    <string name="dex_editor_stub_title">Stub this method with?</string>
+
+
+    <string name="dex_editor_warn">The stub disables the method entirely. Be careful with important methods — the app may break.</string>
+
+
+    <string name="dex_editor_confirm">Stub %1$s → %2$s?</string>
+
+
+    <string name="dex_editor_added">Added: %1$s → %2$s (queued: %3$d)</string>
+
+
+    <string name="dex_editor_already">This method is already queued</string>
+
+
+    <string name="dex_editor_apply">Apply (%1$d)</string>
+
+
+    <string name="dex_editor_clear">Clear queue</string>
+
+
+    <string name="dex_editor_queue_hint">Queued edits: %1$d</string>
+
+
+    <string name="stub_log_result">✅ Methods stubbed: %1$d (not found: %2$d)</string>    <string name="dex_editor_mode_class">Classes</string>
+
+
+    <string name="dex_editor_mode_method">Methods</string>
+
+
+    <string name="dex_editor_mode_string">Strings</string>
+
+
+    <string name="dex_editor_search_method_hint">Search method…</string>
+
+
+    <string name="dex_editor_search_string_hint">Search string in code…</string>
+
+
+    <string name="dex_editor_indexing">Indexing methods…</string>
+
+
+    <string name="dex_editor_searching">Searching…</string>
+
+
+    <string name="dex_editor_searching_progress">Searching… (%1$d/%2$d)</string>
+
+
+    <string name="dex_editor_found">Found: %1$d</string>
+
+
+    <string name="dex_editor_not_found">Nothing found</string>    <string name="dex_editor_no_pkg">(no package)</string>
+
+
+    <string name="code_title">Method code</string>
+
+
+    <string name="code_edit_title">Edit instruction</string>
+
+
+    <string name="code_edit_warn">You can replace it with any instruction of the same size (including a different opcode): registers, values, references. The size cannot change.</string>
+
+
+    <string name="code_edits_n">edits: %1$d</string>
+
+
+    <string name="dex_editor_replace_added">Code edits added: %1$d</string>
+
+
+    <string name="replace_log_result">✅ Code edits: %1$d (of %2$d)</string>
+
+
+    <string name="code_not_found">Method not found</string>    <string name="code_menu_title">Instruction</string>
+
+
+    <string name="code_menu_goto">Go to method</string>
+
+
+    <string name="code_copy_line">Copy line</string>
+
+
+    <string name="code_copy_all">Copy whole method</string>
+
+
+    <string name="copy_done">Copied</string>
+    <string name="copy_log">Copy log</string>
+    <string name="copy_report">Copy report</string>
+    <string name="log_empty">Log is empty</string>
+
+
+    <string name="code_clear_btn">Clear method</string>
+
+
+    <string name="code_clear_title">Clear method?</string>
+
+
+    <string name="code_clear_warn">The method code will be replaced with a return of the selected value. Be careful with important methods.</string>
+
+
+    <string name="code_clear_done">Method will be cleared: %1$s</string>
+
+
+    <string name="code_clear_state">clearing: %1$s</string>
+
+
+    <string name="code_clear_cancelled">Method clearing cancelled</string>    <string name="search_history_title">Saved queries</string>
+
+
+    <string name="search_history_empty">No saved queries</string>    <string name="history_title">History</string>
+    <string name="history_empty">No snapshots yet</string>
+    <string name="history_restore">Restore</string>
+    <string name="history_delete">Delete</string>
+    <string name="history_details">Snapshot</string>
+    <string name="history_restore_confirm">Restore the original APK?\n\n%1$s\n\nThe file will be overwritten.</string>
+    <string name="history_restored">Original restored</string>
+    <string name="history_restore_failed">Could not restore the snapshot</string>
+    <string name="history_deleted">Snapshot deleted</string>
+    <string name="history_clear_cache">Clear cache</string>
+    <string name="history_cache_cleared">Cache cleared</string>
+    <string name="history_size">Size: %1$s</string>
+    <string name="history_date">Date: %1$s</string>
+    <string name="history_no_path">Original path is unavailable — choose a new location</string>
+    <string name="history_saved">Saved: %1$s</string>
+    <string name="patch_url_button">Patches from URL</string>
+    <string name="patch_url_title">Import patch from URL</string>
+    <string name="patch_url_hint">https://example.com/patch.zip</string>
+    <string name="patch_url_checksum_hint">SHA-256 (optional)</string>
+    <string name="patch_url_download">Download</string>
+    <string name="patch_url_downloading">Downloading patch...</string>
+    <string name="patch_url_invalid_url">Enter a valid http(s) URL</string>
+    <string name="patch_url_download_error">Could not download patch: %1$s</string>
+    <string name="patch_url_checksum_mismatch">SHA-256 mismatch.\nExpected: %1$s\nActual: %2$s</string>
+    <string name="patch_url_checksum_ok">SHA-256 matches</string>
+    <string name="patch_url_summary">Author: %1$s\nPackage: %2$s\nVersion: %3$s\nRules: %4$d</string>
+    <string name="patch_url_incompatible">Patch is incompatible: %1$s</string>
+    <string name="patch_url_compatible">Patch is compatible with the selected APK</string>
+    <string name="patch_url_add">Add</string>
+    <string name="patch_url_add_anyway">Add anyway</string>
+    <string name="patch_url_added">Patch added</string>
+    <string name="patch_url_http_warning">This URL is not HTTPS. Download only from a trusted source.</string>
+    <string name="patch_url_unknown">unknown</string>
+    <string name="download_apk_editor_patches">Download APK Editor patches</string>
+    <string name="download_patches_title">APK Editor patches</string>
+    <string name="download_patches_message">The 4PDA page with APK Editor patches will open. Download the ZIP archive, then import it via Patch Editor.</string>
+    <string name="open_link">Open</string>
+    <string name="no_browser">No app found to open this link</string>
+</resources>

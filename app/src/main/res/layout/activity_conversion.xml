@@ -75,6 +75,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textSize="14sp"
+            android:textIsSelectable="true"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:fontFamily="monospace"
             android:lineSpacingExtra="4dp"/>

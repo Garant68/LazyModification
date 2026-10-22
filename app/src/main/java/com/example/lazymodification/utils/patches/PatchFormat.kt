@@ -16,7 +16,10 @@ data class PatchRule(val type: String, val fields: Map<String, String>, val line
 }
 
 data class PatchDocument(val text: String, val author: String, val packagePattern: String,
-                         val engine: Int, val rules: List<PatchRule>) {
+                         val engine: Int, val rules: List<PatchRule>,
+                         val versionNamePattern: String = "*",
+                         val minVersionCode: Int? = null,
+                         val maxVersionCode: Int? = null) {
     val needsSmali: Boolean get() = rules.any { r ->
         r.flag("SMALI_NEEDED") || r.type == "MERGE" ||
             r.value("TARGET").let { it.contains("smali") || it.contains("[APPLICATION]") ||
@@ -33,7 +36,8 @@ data class PatchDocument(val text: String, val author: String, val packagePatter
 object PatchFormat {
     val ruleTypes = listOf("MATCH_REPLACE", "ADD_FILES", "REMOVE_FILES", "MATCH_ASSIGN",
         "MATCH_GOTO", "GOTO", "MERGE", "EXECUTE_DEX", "DUMMY")
-    private val headers = setOf("MIN_ENGINE_VER", "AUTHOR", "PACKAGE")
+    private val headers = setOf("MIN_ENGINE_VER", "AUTHOR", "PACKAGE",
+        "VERSION_NAME", "MIN_VERSION_CODE", "MAX_VERSION_CODE")
     private val keys = setOf("NAME", "TARGET", "SOURCE", "EXTRACT", "MATCH", "REGEX", "DOTALL",
         "REPLACE", "ASSIGN", "GOTO", "SCRIPT", "SMALI_NEEDED", "MAIN_CLASS", "ENTRANCE", "PARAM", "INTERFACE_VERSION")
     const val MAX_TEXT = 4 * 1024 * 1024
@@ -106,13 +110,25 @@ object PatchFormat {
         val engine = metadata["MIN_ENGINE_VER"]?.toIntOrNull() ?: if ("MIN_ENGINE_VER" in metadata)
             throw PatchException("MIN_ENGINE_VER должен быть числом") else 1
         if (engine !in 1..2) throw PatchException("Требуется движок $engine; поддерживаются версии 1 и 2")
+        val minVersionCode = metadata["MIN_VERSION_CODE"]?.let {
+            it.trim().toIntOrNull() ?: throw PatchException("MIN_VERSION_CODE должен быть числом")
+        }
+        val maxVersionCode = metadata["MAX_VERSION_CODE"]?.let {
+            it.trim().toIntOrNull() ?: throw PatchException("MAX_VERSION_CODE должен быть числом")
+        }
+        if (minVersionCode != null && maxVersionCode != null && minVersionCode > maxVersionCode)
+            throw PatchException("MIN_VERSION_CODE больше MAX_VERSION_CODE")
         if (rules.isEmpty()) throw PatchException("В патче нет правил")
         val labels = rules.map { it.name }.filter { it.isNotEmpty() }
         if (labels.size != labels.toSet().size) throw PatchException("Имена NAME должны быть уникальными")
         rules.filter { it.type in listOf("GOTO", "MATCH_GOTO") }.forEach {
             if (it.value("GOTO").trim() !in labels) throw PatchException("Строка ${it.line}: неизвестная метка ${it.value("GOTO")}")
         }
-        return PatchDocument(text, metadata["AUTHOR"].orEmpty(), metadata["PACKAGE"].orEmpty().ifBlank { "*" }, engine, rules)
+        return PatchDocument(
+            text, metadata["AUTHOR"].orEmpty(), metadata["PACKAGE"].orEmpty().ifBlank { "*" }, engine, rules,
+            metadata["VERSION_NAME"].orEmpty().trim().ifBlank { "*" },
+            minVersionCode, maxVersionCode
+        )
     }
 
     fun required(type: String): List<String> = when (type) {

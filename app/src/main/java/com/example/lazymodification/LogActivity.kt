@@ -23,6 +23,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.google.android.material.button.MaterialButton
+import com.example.lazymodification.utils.copyText
 import java.io.File
 
 class LogActivity : AppCompatActivity() {
@@ -42,6 +43,7 @@ class LogActivity : AppCompatActivity() {
     private lateinit var tvStagePercent: TextView
     private lateinit var btnClose: MaterialButton
     private lateinit var btnSave: MaterialButton
+    private lateinit var btnCopy: MaterialButton
     private lateinit var btnInstall: MaterialButton  // ✅ НОВАЯ КНОПКА
 
     private val logBuffer = StringBuilder()
@@ -234,6 +236,7 @@ class LogActivity : AppCompatActivity() {
         tvStagePercent = findViewById(R.id.tvStagePercent)
         btnClose = findViewById(R.id.btnClose)
         btnSave = findViewById(R.id.btnSave)
+        btnCopy = findViewById(R.id.btnCopy)
         btnInstall = findViewById(R.id.btnInstall)  // ✅ Инициализация
 
         sourceApkPath = intent.getStringExtra(EXTRA_SOURCE_APK_PATH)
@@ -241,6 +244,15 @@ class LogActivity : AppCompatActivity() {
         btnClose.visibility = View.GONE
         btnSave.visibility = View.GONE
         btnInstall.visibility = View.GONE
+
+        btnCopy.setOnClickListener {
+            if (plainLogBuffer.isEmpty()) {
+                Toast.makeText(this, getString(R.string.log_empty), Toast.LENGTH_SHORT).show()
+            } else {
+                copyText(getString(R.string.patching_log), plainLogBuffer.toString())
+                Toast.makeText(this, getString(R.string.copy_done), Toast.LENGTH_SHORT).show()
+            }
+        }
 
         btnClose.setOnClickListener {
             tvLog.text = ""

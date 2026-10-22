@@ -1,6 +1,7 @@
 package com.example.lazymodification
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -17,6 +18,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.example.lazymodification.utils.FileSaver
 import com.example.lazymodification.utils.SaveFolderHelper
 import com.example.lazymodification.utils.SignatureConfig
@@ -31,6 +33,11 @@ import java.io.File
  * Форма «Инструменты»: «Редактор Dex» и «Сравнить APK».
  */
 class ToolsActivity : AppCompatActivity() {
+
+    companion object {
+        private const val PATCHES_URL =
+            "https://4pda.to/forum/index.php?showtopic=575450&view=findpost&p=132539613"
+    }
 
 
     private val pickApkForDexEditorLauncher = registerForActivityResult(
@@ -69,6 +76,24 @@ class ToolsActivity : AppCompatActivity() {
         findViewById<MaterialButton>(R.id.btnPatchEditor).setOnClickListener {
             startActivity(Intent(this, PatchEditorActivity::class.java))
         }
+        findViewById<MaterialButton>(R.id.btnDownloadPatches).setOnClickListener {
+            showDownloadPatchesDialog()
+        }
+    }
+
+    private fun showDownloadPatchesDialog() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.download_patches_title)
+            .setMessage(R.string.download_patches_message)
+            .setPositiveButton(R.string.open_link) { _, _ ->
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PATCHES_URL)))
+                } catch (_: Exception) {
+                    Toast.makeText(this, getString(R.string.no_browser), Toast.LENGTH_LONG).show()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     // ============================================================

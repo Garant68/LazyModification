@@ -58,6 +58,18 @@
             app:iconGravity="textStart"
             app:iconPadding="12dp" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnDownloadPatches"
+            android:layout_width="match_parent"
+            android:layout_height="70dp"
+            android:layout_marginTop="16dp"
+            android:padding="12dp"
+            android:text="@string/download_apk_editor_patches"
+            android:textSize="16sp"
+            app:icon="@android:drawable/ic_menu_save"
+            app:iconGravity="textStart"
+            app:iconPadding="12dp" />
+
 
     </LinearLayout>
 </ScrollView>

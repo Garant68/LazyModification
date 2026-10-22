@@ -127,6 +127,15 @@ object SigningUtils {
      * при неудаче — собственная поддержка JKS (Android) или BC (BKS и т.п.).
      */
     fun openKeyStore(type: String): KeyStore {
+        if (type.equals("PKCS12", ignoreCase = true)) {
+            // Android 10's system PKCS12 provider cannot decrypt PBES2/PBKDF2
+            // (OID 1.2.840.113549.1.5.12). BouncyCastle handles these keystores.
+            return try {
+                KeyStore.getInstance("PKCS12", bcProvider)
+            } catch (_: Throwable) {
+                KeyStore.getInstance("PKCS12")
+            }
+        }
         return try {
             KeyStore.getInstance(type)
         } catch (t: Throwable) {

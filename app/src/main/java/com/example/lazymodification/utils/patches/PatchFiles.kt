@@ -30,15 +30,30 @@ object PatchFiles {
                     }
                 }
             } ?: throw PatchException("Не удалось прочитать файл")
-            val document = PatchFormat.read(file)
-            if (file.extension.equals("txt", true)) {
-                val zip = File(folder, file.nameWithoutExtension + ".zip")
-                PatchFormat.writeZip(zip, document.text, emptyMap())
-                file.delete()
-                return zip
-            }
-            return file
+            return normalizeImported(file, folder)
         } catch (t: Throwable) { folder.deleteRecursively(); throw t }
+    }
+
+    /** Импорт уже скачанного файла (например, по URL). */
+    fun importFile(context: Context, source: File, fileName: String = source.name): File {
+        val folder = File(context.cacheDir, "imported_patches/${UUID.randomUUID()}").apply { mkdirs() }
+        try {
+            val safeName = fileName.replace(Regex("[\\\\/:*?\"<>|]"), "_").ifBlank { "patch.zip" }
+            val file = File(folder, safeName)
+            source.copyTo(file, overwrite = true)
+            return normalizeImported(file, folder)
+        } catch (t: Throwable) { folder.deleteRecursively(); throw t }
+    }
+
+    private fun normalizeImported(file: File, folder: File): File {
+        val document = PatchFormat.read(file)
+        if (file.extension.equals("txt", true)) {
+            val zip = File(folder, file.nameWithoutExtension + ".zip")
+            PatchFormat.writeZip(zip, document.text, emptyMap())
+            file.delete()
+            return zip
+        }
+        return file
     }
 
     fun extractPayloads(archive: File, directory: File) {

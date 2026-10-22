@@ -49,6 +49,7 @@
         <activity android:name=".EditApkActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
         <activity android:name=".PatchActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
         <activity android:name=".PatchEditorActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
+        <activity android:name=".HistoryActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
         <activity android:name=".LogActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
         <activity android:name=".CloneApkActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
         <activity android:name=".CloneFileBrowserActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />

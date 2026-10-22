@@ -25,6 +25,7 @@ import com.example.lazymodification.utils.SignatureKiller
 import com.example.lazymodification.utils.DpiRemove
 import com.example.lazymodification.utils.FastZipRepack
 import com.example.lazymodification.utils.SignatureConfig
+import com.example.lazymodification.utils.PatchHistory
 import com.example.lazymodification.utils.SigningUtils
 import com.example.lazymodification.utils.ZipOptimizer
 import com.example.lazymodification.utils.patches.ApkPatchRunner
@@ -384,6 +385,34 @@ class PatchService : Service() {
         val totalStart = System.currentTimeMillis()
         val sizeMb = apkFile.length() / (1024.0 * 1024.0)
         sendLog(getString(R.string.log_start, apkFile.name, String.format("%.1f", sizeMb)), "INFO")
+
+        // Снимок исходника и запись запуска в историю — до любых изменений.
+        try {
+            val info = packageManager.getPackageArchiveInfo(apkFile.absolutePath, 0)
+            val versionCode = if (android.os.Build.VERSION.SDK_INT >= 28)
+                info?.longVersionCode?.toInt() else info?.versionCode
+            val parts = ArrayList<String>()
+            if (patchGooglePlay) parts += "Google Play"
+            if (patchRemoveAds) parts += "Реклама"
+            if (patchRemoveAnalytics) parts += "Аналитика"
+            if (patchRemoveGPServices) parts += "GP-сервисы"
+            if (patchRemoveVpn) parts += "VPN"
+            if (patchRemoveInstallerCheck) parts += "Проверка установщика"
+            if (patchRemoveUpdate) parts += "Обновления"
+            if (patchAllowScreenshots) parts += "Скриншоты"
+            if (patchRemoveSignature) parts += "Подпись"
+            if (patchRemoveLocales) parts += "Локали"
+            if (patchRemoveDpi) parts += "DPI"
+            if (patchRemoveLibs) parts += "Библиотеки"
+            if (patchOptimize) parts += "UltraZip"
+            customPatches.forEach { parts += "Патч: ${File(it).name}" }
+            PatchHistory.record(
+                this, apkFile, parts.joinToString(", ").ifBlank { "Патчинг" },
+                info?.packageName, info?.versionName, versionCode
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "history record failed", e)
+        }
         sendLog("🔧 GP=$patchGooglePlay, Ads=$patchRemoveAds, Analytics=$patchRemoveAnalytics, GP_Svc=$patchRemoveGPServices, VPN=$patchRemoveVpn, Installer=$patchRemoveInstallerCheck, Locales=$patchRemoveLocales, DPI=$patchRemoveDpi, Libs=$patchRemoveLibs, Optimize=$patchOptimize, Update=$patchRemoveUpdate, Shots=$patchAllowScreenshots, Stubs=${stubEdits.size}, CodeEdits=${codeEdits.size}, Sign=$patchRemoveSignature, Debug=${if (toolsKillOnly) "off" else "auto"}", "INFO")
 
         if (patchRemoveLocales && !localesToRemove.isNullOrEmpty()) sendLog(getString(R.string.log_locales_selected, localesToRemove.size), "INFO")
@@ -410,7 +439,7 @@ class PatchService : Service() {
         if (needsDexPatching) addStage("Обработка dex", 50f)
         if (needsDexPatching && patchRemoveSignature) addStage("Внедрение движка подписи", 4f)
         if (needsDexPatching) addStage("Пересборка APK", 12f)
-        if (needsDexPatching && patchOptimize) addStage("Оптимизация (сжатие)", 5f)
+        if (patchOptimize && !signConfig.noSign) addStage("UltraZip (Zopfli)", 5f)
         if (hasTail) addStage("ZipAlign", 2f)
         if (hasTail) addStage("Подпись", 4f)
         if (hasTail) addStage("Сохранение результата", 3f)
@@ -745,7 +774,7 @@ class PatchService : Service() {
                     System.gc()
                 }
 
-                if (patchOptimize) {
+                if (patchOptimize && !signConfig.noSign) {
                     anyApplied = true
                     stageBegin()
                     val optimizedApk = File(workDir, "optimized.apk")
@@ -837,6 +866,34 @@ class PatchService : Service() {
                 }
 
             } else {
+                if (patchOptimize && !signConfig.noSign && (patchRemoveLocales || patchRemoveDpi || patchRemoveLibs || customPatches.isNotEmpty())) {
+                    stageBegin()
+                    val optimizedApk = File(workDir, "optimized.apk")
+                    try {
+                        var lastOptPct = -1
+                        val savedBytes = ZipOptimizer.recompressUltra(workingApk, optimizedApk) { cb, ct ->
+                            val pct = if (ct > 0) ((cb * 100) / ct).toInt() else 100
+                            if (pct != lastOptPct) {
+                                lastOptPct = pct
+                                stageTick((cb.toFloat() / ct.coerceAtLeast(1L)).coerceIn(0f, 1f), "")
+                            }
+                        }
+                        if (savedBytes > 0 && optimizedApk.exists()) {
+                            workingApk.delete()
+                            workingApk = optimizedApk
+                            stageDone(" — -$savedBytes байт")
+                        } else {
+                            optimizedApk.delete()
+                            sendLog("⚠️ Сжатие не дало выигрыша, оставляем без изменений", "WARNING")
+                            stageDone()
+                        }
+                    } catch (e: Exception) {
+                        optimizedApk.delete()
+                        sendLog("⚠️ Оптимизация: ${e.message}", "WARNING")
+                        stageDone()
+                    }
+                }
+
                 if (patchRemoveLocales || patchRemoveDpi || patchRemoveLibs || customPatches.isNotEmpty()) {
                     stageBegin()
                     val alignedApk = File(workDir, "aligned.apk")

@@ -2,12 +2,14 @@ package com.example.lazymodification
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
+import android.app.ProgressDialog
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.Gravity
 import android.view.View
 import com.google.android.material.checkbox.MaterialCheckBox as CheckBox
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
@@ -21,10 +23,18 @@ import com.example.lazymodification.utils.DexPatcher
 import com.example.lazymodification.utils.DpiRemove
 import com.example.lazymodification.utils.SignatureConfig
 import com.example.lazymodification.utils.SigningUtils
+import com.example.lazymodification.utils.copyText
+import com.example.lazymodification.utils.patches.PatchCompatibility
+import com.example.lazymodification.utils.patches.PatchDocument
 import com.example.lazymodification.utils.patches.PatchFiles
+import com.example.lazymodification.utils.patches.PatchFormat
 import com.google.android.material.button.MaterialButton
 import com.reandroid.apk.ApkModule
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+import java.security.MessageDigest
+import java.util.Locale
 
 class PatchActivity : AppCompatActivity() {
 
@@ -308,6 +318,7 @@ class PatchActivity : AppCompatActivity() {
         checkBoxRemoveDpi.setToggleCheckedStateOnClick(true)
         checkBoxRemoveLibs.setToggleCheckedStateOnClick(true)
         checkBoxOptimize.setToggleCheckedStateOnClick(true)
+        checkBoxOptimize.isChecked = true
 
         for (b in listOf(
             checkBoxGooglePlay, checkBoxRemoveAds, checkBoxRemoveAnalytics, checkBoxRemoveGPServices,
@@ -721,17 +732,203 @@ class PatchActivity : AppCompatActivity() {
                 checkBoxRemoveLibs.isChecked || checkBoxOptimize.isChecked || customPatches.isNotEmpty()
     }
 
+    private fun showPatchUrlDialog() {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 12, 48, 4)
+        }
+        val etUrl = EditText(this).apply {
+            hint = getString(R.string.patch_url_hint)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+            setSingleLine(true)
+        }
+        val etSha = EditText(this).apply {
+            hint = getString(R.string.patch_url_checksum_hint)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT
+            setSingleLine(true)
+        }
+        container.addView(etUrl)
+        container.addView(etSha)
+
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.patch_url_title)
+            .setView(container)
+            .setPositiveButton(R.string.patch_url_download, null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val url = etUrl.text.toString().trim()
+                if (!url.startsWith("https://", true) && !url.startsWith("http://", true)) {
+                    Toast.makeText(this, getString(R.string.patch_url_invalid_url), Toast.LENGTH_LONG).show()
+                    return@setOnClickListener
+                }
+                if (url.startsWith("http://", true)) {
+                    Toast.makeText(this, getString(R.string.patch_url_http_warning), Toast.LENGTH_LONG).show()
+                }
+                dialog.dismiss()
+                downloadPatchFromUrl(url, etSha.text.toString())
+            }
+        }
+        dialog.show()
+    }
+
+    private fun downloadPatchFromUrl(rawUrl: String, rawSha: String) {
+        val progress = ProgressDialog(this).apply {
+            setMessage(getString(R.string.patch_url_downloading))
+            setCancelable(false)
+            show()
+        }
+        Thread {
+            var temp: File? = null
+            var connection: HttpURLConnection? = null
+            try {
+                val url = URL(rawUrl)
+                connection = (url.openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 15_000
+                    readTimeout = 30_000
+                    instanceFollowRedirects = true
+                    setRequestProperty("User-Agent", "LazyModification/1.26")
+                }
+                val code = connection.responseCode
+                if (code !in 200..299) throw Exception("HTTP $code")
+                val length = connection.getHeaderField("Content-Length")?.toLongOrNull() ?: -1L
+                if (length > 256L * 1024 * 1024) throw Exception("ZIP больше 256 МБ")
+
+                val dir = File(cacheDir, "url_patches").apply { mkdirs() }
+                temp = File(dir, "patch_${System.currentTimeMillis()}.zip")
+                val digest = MessageDigest.getInstance("SHA-256")
+                var total = 0L
+                connection.inputStream.use { input ->
+                    temp.outputStream().use { output ->
+                        val buffer = ByteArray(64 * 1024)
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read < 0) break
+                            total += read
+                            if (total > 256L * 1024 * 1024) throw Exception("ZIP больше 256 МБ")
+                            digest.update(buffer, 0, read)
+                            output.write(buffer, 0, read)
+                        }
+                    }
+                }
+                val actualSha = digest.digest().joinToString("") { "%02x".format(it) }
+                val expectedSha = normalizeSha(rawSha)
+                if (expectedSha.isNotEmpty() && expectedSha != actualSha) {
+                    throw Exception(getString(R.string.patch_url_checksum_mismatch, expectedSha, actualSha))
+                }
+                val document = PatchFormat.read(temp!!)
+                val info = packageManager.getPackageArchiveInfo(apkPath!!, 0)
+                val versionCode = if (android.os.Build.VERSION.SDK_INT >= 28)
+                    info?.longVersionCode?.toInt() else info?.versionCode
+                val compatibility = PatchCompatibility.check(
+                    document, info?.packageName, info?.versionName, versionCode
+                )
+                runOnUiThread {
+                    progress.dismiss()
+                    showPatchUrlResult(temp!!, document, actualSha, expectedSha, compatibility)
+                }
+            } catch (t: Throwable) {
+                temp?.delete()
+                runOnUiThread {
+                    progress.dismiss()
+                    MaterialAlertDialogBuilder(this)
+                        .setTitle(R.string.patch_url_title)
+                        .setMessage(getString(R.string.patch_url_download_error, t.message ?: "?"))
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show()
+                }
+            } finally {
+                connection?.disconnect()
+            }
+        }.start()
+    }
+
+    private fun showPatchUrlResult(
+        file: File,
+        document: PatchDocument,
+        actualSha: String,
+        expectedSha: String,
+        compatibility: PatchCompatibility.Result
+    ) {
+        val version = buildString {
+            if (document.versionNamePattern != "*") append(document.versionNamePattern)
+            if (document.minVersionCode != null || document.maxVersionCode != null) {
+                if (isNotEmpty()) append(" / ")
+                append("code ")
+                when {
+                    document.minVersionCode != null && document.maxVersionCode != null ->
+                        append("${document.minVersionCode}..${document.maxVersionCode}")
+                    document.minVersionCode != null -> append(">= ${document.minVersionCode}")
+                    else -> append("<= ${document.maxVersionCode}")
+                }
+            }
+            if (isEmpty()) append("*")
+        }
+        val summary = getString(
+            R.string.patch_url_summary,
+            document.author.ifBlank { getString(R.string.patch_url_unknown) },
+            document.packagePattern,
+            version,
+            document.rules.size
+        )
+        val message = buildString {
+            append(summary)
+            append("\n\nSHA-256: ").append(actualSha)
+            if (expectedSha.isNotEmpty()) append("\n").append(getString(R.string.patch_url_checksum_ok))
+            append("\n\n")
+            append(if (compatibility.compatible) getString(R.string.patch_url_compatible)
+                else getString(R.string.patch_url_incompatible, compatibility.message))
+        }
+        val builder = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.patch_url_title)
+            .setMessage(message)
+            .setNegativeButton(android.R.string.cancel) { _, _ -> file.delete() }
+            .setOnCancelListener { file.delete() }
+        if (compatibility.compatible) {
+            builder.setPositiveButton(R.string.patch_url_add) { _, _ -> addDownloadedPatch(file) }
+        } else {
+            builder.setPositiveButton(R.string.patch_url_add_anyway) { _, _ -> addDownloadedPatch(file) }
+        }
+        builder.show()
+    }
+
+    private fun addDownloadedPatch(file: File) {
+        try {
+            val imported = PatchFiles.importFile(this, file)
+            customPatches.add(imported.path)
+            refreshCustomPatches()
+            Toast.makeText(this, getString(R.string.patch_url_added), Toast.LENGTH_SHORT).show()
+        } catch (t: Throwable) {
+            MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.patch_url_title)
+                .setMessage(getString(R.string.patch_url_download_error, t.message ?: "?"))
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+        } finally {
+            file.delete()
+        }
+    }
+
+    private fun normalizeSha(value: String): String = value.trim().lowercase(Locale.US)
+        .removePrefix("sha256:").replace(Regex("\\s+"), "")
+
     private fun showInspectorReport(report: String) {
         val tv = TextView(this).apply {
             text = report
             textSize = 14f
+            setTextIsSelectable(true)
             setPadding(48, 24, 48, 24)
         }
         val sv = ScrollView(this).apply { addView(tv) }
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.inspector_title)
             .setView(sv)
-            .setPositiveButton(android.R.string.ok, null)
+            .setPositiveButton(R.string.copy_report) { _, _ ->
+                copyText(getString(R.string.inspector_title), report)
+                Toast.makeText(this, getString(R.string.copy_done), Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton(android.R.string.ok, null)
             .create()
             .show()
     }
