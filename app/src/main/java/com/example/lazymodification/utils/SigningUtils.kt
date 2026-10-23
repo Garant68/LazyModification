@@ -123,8 +123,8 @@ object SigningUtils {
     private val bcProvider: Provider by lazy { org.bouncycastle.jce.provider.BouncyCastleProvider() }
 
     /**
-     * Открывает хранилище ключей: сначала системный провайдер,
-     * при неудаче — собственная поддержка JKS (Android) или BC (BKS и т.п.).
+     * Открывает хранилище ключей. Для PKCS12 сначала используется BouncyCastle:
+     * системный провайдер Android 10 не поддерживает PBES2/PBKDF2.
      */
     fun openKeyStore(type: String): KeyStore {
         if (type.equals("PKCS12", ignoreCase = true)) {
@@ -764,7 +764,7 @@ object SigningUtils {
             alias = config.keyAlias
             keyPassword = config.keyPassword.toCharArray()
         } else {
-            keyStore = KeyStore.getInstance("PKCS12")
+            keyStore = openKeyStore("PKCS12")
             context.assets.open("testkey.p12").use {
                 keyStore.load(it, "android".toCharArray())
             }
