@@ -13,6 +13,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.example.lazymodification.utils.SigningUtils
 import com.example.lazymodification.utils.SaveFolderHelper
+import com.example.lazymodification.utils.WorkingFolderHelper
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.button.MaterialButton
 import java.io.File
 
@@ -65,6 +67,22 @@ class MainActivity : AppCompatActivity() {
                 ).show()
             } catch (e: Exception) {
                 Toast.makeText(this, getString(R.string.error_with_msg, e.message), Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private val workingFolderPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val path = result.data?.getStringExtra(FolderPickerActivity.EXTRA_SELECTED_PATH)
+            if (!path.isNullOrBlank()) {
+                WorkingFolderHelper.save(this, File(path))
+                Toast.makeText(
+                    this,
+                    getString(R.string.working_folder_set, path),
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }
@@ -177,6 +195,7 @@ class MainActivity : AppCompatActivity() {
                     R.id.action_sort_date -> { saveSortMode(FileBrowserActivity.SORT_DATE); true }
                     R.id.action_sort_size -> { saveSortMode(FileBrowserActivity.SORT_SIZE); true }
                     R.id.action_signature -> { showSigningSettings(); true }
+                    R.id.action_working_folder -> { showWorkingFolderDialog(); true }
                     R.id.action_lang_ru -> { LocaleHelper.setLang("ru"); recreate(); true }
                     R.id.action_lang_en -> { LocaleHelper.setLang("en"); recreate(); true }
                     R.id.action_lang_bg -> { LocaleHelper.setLang("bg"); recreate(); true }
@@ -228,6 +247,34 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, getString(R.string.signature_saved), Toast.LENGTH_SHORT).show()
             }
         )
+    }
+
+    private fun showWorkingFolderDialog() {
+        val current = WorkingFolderHelper.getFolder(this)?.absolutePath
+        val builder = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.working_folder)
+            .setMessage(
+                if (current != null) {
+                    getString(R.string.working_folder_current, current)
+                } else {
+                    getString(R.string.working_folder_not_set)
+                }
+            )
+            .setPositiveButton(R.string.choose_folder) { _, _ ->
+                workingFolderPickerLauncher.launch(
+                    Intent(this, FolderPickerActivity::class.java)
+                )
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+
+        if (current != null) {
+            builder.setNeutralButton(R.string.default_folder) { _, _ ->
+                WorkingFolderHelper.clear(this)
+                Toast.makeText(this, getString(R.string.working_folder_reset), Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        builder.show()
     }
 
     private fun setupApkOperationsButton() {

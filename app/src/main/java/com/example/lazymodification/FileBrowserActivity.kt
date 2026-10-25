@@ -15,6 +15,8 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.example.lazymodification.utils.StorageRoots
+import com.example.lazymodification.utils.WorkingFolderHelper
 import java.io.File
 
 class FileBrowserActivity : AppCompatActivity() {
@@ -66,9 +68,16 @@ class FileBrowserActivity : AppCompatActivity() {
         // ✅ Обработка системной кнопки "Назад" — возврат в родительскую папку
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                val rootPath = Environment.getExternalStorageDirectory().absolutePath
-                if (currentDir.absolutePath != rootPath && currentDir.parentFile != null) {
-                    currentDir = currentDir.parentFile!!
+                if (!::currentDir.isInitialized) {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                    return
+                }
+                val parent = currentDir.parentFile
+                if (!StorageRoots.isRoot(this@FileBrowserActivity, currentDir) &&
+                    parent != null && parent.canRead()
+                ) {
+                    currentDir = parent
                     loadFiles()
                 } else {
                     isEnabled = false
@@ -142,7 +151,12 @@ class FileBrowserActivity : AppCompatActivity() {
         val root = Environment.getExternalStorageDirectory()
         val saved = loadLastDir()
         val savedDir = if (saved != null) File(saved) else null
-        currentDir = if (savedDir != null && savedDir.isDirectory && savedDir.canRead()) savedDir else root
+        val workingDir = WorkingFolderHelper.getFolder(this)
+        currentDir = when {
+            workingDir != null -> workingDir
+            savedDir != null && savedDir.isDirectory && savedDir.canRead() -> savedDir
+            else -> root
+        }
         loadFiles()
         listView.setOnItemClickListener { _, _, position, _ ->
             val file = currentFiles.getOrNull(position) ?: return@setOnItemClickListener

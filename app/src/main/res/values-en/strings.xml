@@ -602,6 +602,30 @@
 
     <string name="save_folder_reset">Using default folder (Download/LazyModification)</string>
 
+    <string name="working_folder">Working folder</string>
+
+    <string name="working_folder_current">Current working folder:\n%1$s</string>
+
+    <string name="working_folder_not_set">No working folder selected.\nThe file browser opens in the last folder.</string>
+
+    <string name="working_folder_set">Working folder: %1$s</string>
+
+    <string name="working_folder_reset">Working folder reset</string>
+
+    <string name="folder_picker_title">Choose working folder</string>
+
+    <string name="storage_roots">Storage</string>
+
+    <string name="storage_internal">Internal storage</string>
+
+    <string name="storage_sd_named">SD card: %1$s</string>
+
+    <string name="select_this_folder">Select this folder</string>
+
+    <string name="folders_empty">No folders</string>
+
+    <string name="folder_up">Up</string>
+
     <string name="remove_installer_check">Remove installer check</string>
 
     <string name="lang_bg">Български</string>
@@ -1021,8 +1045,12 @@
     <string name="history_restored">Original restored</string>
     <string name="history_restore_failed">Could not restore the snapshot</string>
     <string name="history_deleted">Snapshot deleted</string>
-    <string name="history_clear_cache">Clear cache</string>
-    <string name="history_cache_cleared">Cache cleared</string>
+    <string name="history_clear_cache">Delete cache</string>
+    <string name="history_cache_cleared">Cache deleted: %1$s</string>
+    <string name="history_cache_checking">Calculating cache size…</string>
+    <string name="history_cache_available">Can free: %1$s</string>
+    <string name="history_cache_empty">Cache is empty — nothing to delete</string>
+    <string name="history_cache_confirm">The parsed APK cache will be deleted.\n\nCan free: %1$s.\nPatch history and settings will be kept.</string>
     <string name="history_size">Size: %1$s</string>
     <string name="history_date">Date: %1$s</string>
     <string name="history_no_path">Original path is unavailable — choose a new location</string>

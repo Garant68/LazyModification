@@ -170,6 +170,30 @@
 
     <string name="save_folder_reset">Използва се папката по подразбиране (Download/LazyModification)</string>
 
+    <string name="working_folder">Работна папка</string>
+
+    <string name="working_folder_current">Текуща работна папка:\n%1$s</string>
+
+    <string name="working_folder_not_set">Работната папка не е избрана.\nФайловият мениджър се отваря в последната папка.</string>
+
+    <string name="working_folder_set">Работна папка: %1$s</string>
+
+    <string name="working_folder_reset">Работната папка е нулирана</string>
+
+    <string name="folder_picker_title">Избор на работна папка</string>
+
+    <string name="storage_roots">Хранилище</string>
+
+    <string name="storage_internal">Вътрешна памет</string>
+
+    <string name="storage_sd_named">SD карта: %1$s</string>
+
+    <string name="select_this_folder">Избери тази папка</string>
+
+    <string name="folders_empty">Няма папки</string>
+
+    <string name="folder_up">Нагоре</string>
+
 
 
     <string name="status_insert_marquee">⏳ Вмъкване на плъзгащ се текст...</string>
@@ -1005,8 +1029,12 @@
     <string name="history_restored">Оригиналът е възстановен</string>
     <string name="history_restore_failed">Копието не може да бъде възстановено</string>
     <string name="history_deleted">Копието е изтрито</string>
-    <string name="history_clear_cache">Изчисти кеша</string>
-    <string name="history_cache_cleared">Кешът е изчистен</string>
+    <string name="history_clear_cache">Изтрий кеша</string>
+    <string name="history_cache_cleared">Кешът е изтрит: %1$s</string>
+    <string name="history_cache_checking">Изчисляване на размера на кеша…</string>
+    <string name="history_cache_available">Може да се освободи: %1$s</string>
+    <string name="history_cache_empty">Кешът е празен — няма какво да се изтрие</string>
+    <string name="history_cache_confirm">Ще бъде изтрит кешът на разглобените APK.\n\nМоже да се освободи: %1$s.\nИсторията на пачовете и настройките ще бъдат запазени.</string>
     <string name="history_size">Размер: %1$s</string>
     <string name="history_date">Дата: %1$s</string>
     <string name="history_no_path">Оригиналният път не е достъпен — изберете ново място</string>

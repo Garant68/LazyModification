@@ -22,6 +22,7 @@ class HistoryActivity : AppCompatActivity() {
 
     private lateinit var listView: LinearLayout
     private lateinit var tvEmpty: TextView
+    private lateinit var tvCacheSize: TextView
     private var pendingRestore: PatchHistory.Entry? = null
 
     private val createDocument = registerForActivityResult(
@@ -46,8 +47,10 @@ class HistoryActivity : AppCompatActivity() {
         setContentView(R.layout.activity_history)
         listView = findViewById(R.id.historyList)
         tvEmpty = findViewById(R.id.tvEmpty)
+        tvCacheSize = findViewById(R.id.tvCacheSize)
         findViewById<MaterialButton>(R.id.btnClearCache).setOnClickListener { confirmClearCache() }
         loadHistory()
+        refreshCacheSize()
     }
 
     private fun loadHistory() {
@@ -194,23 +197,82 @@ class HistoryActivity : AppCompatActivity() {
     }
 
     private fun confirmClearCache() {
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.history_clear_cache)
-            .setMessage(getString(R.string.history_clear_cache))
-            .setPositiveButton(R.string.history_clear_cache) { _, _ ->
-                ApkProjectCache.clear(this)
-                Toast.makeText(this, getString(R.string.history_cache_cleared), Toast.LENGTH_SHORT).show()
+        Thread {
+            val cacheBytes = runCatching { ApkProjectCache.size(this) }.getOrDefault(0L)
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (cacheBytes <= 0L) {
+                    MaterialAlertDialogBuilder(this)
+                        .setTitle(R.string.history_clear_cache)
+                        .setMessage(R.string.history_cache_empty)
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show()
+                    return@runOnUiThread
+                }
+
+                MaterialAlertDialogBuilder(this)
+                    .setTitle(R.string.history_clear_cache)
+                    .setMessage(
+                        getString(
+                            R.string.history_cache_confirm,
+                            formatSize(cacheBytes)
+                        )
+                    )
+                    .setPositiveButton(R.string.history_clear_cache) { _, _ ->
+                        clearCache(cacheBytes)
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
             }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        }.start()
+    }
+
+    private fun clearCache(sizeBefore: Long) {
+        Thread {
+            runCatching { ApkProjectCache.clear(this) }
+            val sizeAfter = runCatching { ApkProjectCache.size(this) }.getOrDefault(0L)
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                val freed = (sizeBefore - sizeAfter).coerceAtLeast(0L)
+                tvCacheSize.text = getString(
+                    R.string.history_cache_available,
+                    formatSize(sizeAfter)
+                )
+                Toast.makeText(
+                    this,
+                    getString(R.string.history_cache_cleared, formatSize(freed)),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }.start()
+    }
+
+    private fun refreshCacheSize() {
+        tvCacheSize.text = getString(R.string.history_cache_checking)
+        Thread {
+            val cacheBytes = runCatching { ApkProjectCache.size(this) }.getOrDefault(0L)
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                tvCacheSize.text = getString(
+                    R.string.history_cache_available,
+                    formatSize(cacheBytes)
+                )
+            }
+        }.start()
     }
 
     private fun formatDate(time: Long): String =
         SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(time))
 
-    private fun formatSize(bytes: Long): String =
-        if (bytes >= 1024 * 1024) String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024.0))
-        else String.format(Locale.US, "%.0f KB", bytes / 1024.0)
+    private fun formatSize(bytes: Long): String = when {
+        bytes >= 1024L * 1024L * 1024L ->
+            String.format(Locale.US, "%.2f GB", bytes / (1024.0 * 1024.0 * 1024.0))
+        bytes >= 1024L * 1024L ->
+            String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024.0))
+        bytes >= 1024L ->
+            String.format(Locale.US, "%.0f KB", bytes / 1024.0)
+        else -> "$bytes B"
+    }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 }

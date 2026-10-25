@@ -598,6 +598,30 @@
 
     <string name="save_folder_reset">Используется папка по умолчанию (Download/LazyModification)</string>
 
+    <string name="working_folder">Рабочая папка</string>
+
+    <string name="working_folder_current">Текущая рабочая папка:\n%1$s</string>
+
+    <string name="working_folder_not_set">Рабочая папка не выбрана.\nФайловый менеджер открывается в последней папке.</string>
+
+    <string name="working_folder_set">Рабочая папка: %1$s</string>
+
+    <string name="working_folder_reset">Рабочая папка сброшена</string>
+
+    <string name="folder_picker_title">Выбор рабочей папки</string>
+
+    <string name="storage_roots">Хранилище</string>
+
+    <string name="storage_internal">Внутренняя память</string>
+
+    <string name="storage_sd_named">SD-карта: %1$s</string>
+
+    <string name="select_this_folder">Выбрать эту папку</string>
+
+    <string name="folders_empty">Папок нет</string>
+
+    <string name="folder_up">Наверх</string>
+
     <string name="remove_installer_check">Удалить проверку установщика</string>
 
     <string name="lang_bg">Български</string>
@@ -1017,8 +1041,12 @@
     <string name="history_restored">Исходник восстановлен</string>
     <string name="history_restore_failed">Не удалось восстановить снимок</string>
     <string name="history_deleted">Снимок удалён</string>
-    <string name="history_clear_cache">Очистить кэш</string>
-    <string name="history_cache_cleared">Кэш очищен</string>
+    <string name="history_clear_cache">Удалить кэш</string>
+    <string name="history_cache_cleared">Кэш удалён: %1$s</string>
+    <string name="history_cache_checking">Считаю размер кэша…</string>
+    <string name="history_cache_available">Можно освободить: %1$s</string>
+    <string name="history_cache_empty">Кэш пуст — удалять нечего</string>
+    <string name="history_cache_confirm">Будет удалён кэш разобранных APK.\n\nМожно освободить: %1$s.\nИстория патчей и настройки сохранятся.</string>
     <string name="history_size">Размер: %1$s</string>
     <string name="history_date">Дата: %1$s</string>
     <string name="history_no_path">Исходный путь недоступен — выберите новое место</string>

@@ -764,8 +764,10 @@ object SigningUtils {
             alias = config.keyAlias
             keyPassword = config.keyPassword.toCharArray()
         } else {
-            keyStore = openKeyStore("PKCS12")
-            context.assets.open("testkey.p12").use {
+            // Встроенный ключ храним в JKS: на Android 10 системный PKCS12
+            // не умеет PBES2/PBKDF2, а JKS читается на всех поддерживаемых API.
+            keyStore = JksSupport.openJks()
+            context.assets.open("testkey.jks").use {
                 keyStore.load(it, "android".toCharArray())
             }
             alias = "androiddebugkey"

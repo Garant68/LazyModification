@@ -2,7 +2,10 @@ package com.example.lazymodification
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.example.lazymodification.utils.JksSupport
 import com.example.lazymodification.utils.SigningUtils
+import com.example.lazymodification.utils.SignatureConfig
+import java.io.File
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -17,5 +20,25 @@ class SigningAndroidTest {
         context.assets.open("testkey.p12").use { keyStore.load(it, "android".toCharArray()) }
         assertTrue(keyStore.containsAlias("androiddebugkey"))
         assertNotNull(keyStore.getKey("androiddebugkey", "android".toCharArray()))
+    }
+
+    @Test
+    fun bundledJksLoadsOnAllApis() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val keyStore = JksSupport.openJks()
+        context.assets.open("testkey.jks").use { keyStore.load(it, "android".toCharArray()) }
+        assertTrue(keyStore.containsAlias("androiddebugkey"))
+        assertNotNull(keyStore.getKey("androiddebugkey", "android".toCharArray()))
+    }
+
+    @Test
+    fun signsApkWithBundledJks() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val input = File(context.packageManager.getApplicationInfo(context.packageName, 0).sourceDir)
+        val output = File(context.cacheDir, "jks-sign-test.apk")
+        if (output.exists()) output.delete()
+        SigningUtils.signApk(context, input, output, SignatureConfig())
+        assertTrue(output.exists())
+        assertTrue(output.length() > 0)
     }
 }

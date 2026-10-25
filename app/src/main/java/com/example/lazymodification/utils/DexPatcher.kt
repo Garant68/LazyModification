@@ -12,6 +12,8 @@ import org.jf.dexlib2.DexFileFactory
 import org.jf.dexlib2.Opcodes
 import org.jf.dexlib2.Opcode
 import org.jf.dexlib2.iface.Field
+import org.jf.dexlib2.iface.ExceptionHandler
+import org.jf.dexlib2.iface.TryBlock
 import org.jf.dexlib2.iface.instruction.Instruction
 import org.jf.dexlib2.iface.instruction.OneRegisterInstruction
 import org.jf.dexlib2.iface.instruction.ReferenceInstruction
@@ -27,6 +29,8 @@ import org.jf.dexlib2.immutable.ImmutableDexFile
 import org.jf.dexlib2.immutable.ImmutableField
 import org.jf.dexlib2.immutable.ImmutableMethod
 import org.jf.dexlib2.immutable.ImmutableMethodImplementation
+import org.jf.dexlib2.immutable.ImmutableExceptionHandler
+import org.jf.dexlib2.immutable.ImmutableTryBlock
 import org.jf.dexlib2.immutable.instruction.*
 import org.jf.dexlib2.immutable.reference.ImmutableStringReference
 import org.jf.dexlib2.immutable.value.ImmutableStringEncodedValue
@@ -286,8 +290,8 @@ object DexPatcher {
             return PatchResult()
         }
 
-        val opcodes = Opcodes.forApi(28)
-        val dex = DexFileFactory.loadDexFile(inputDex, opcodes)
+        val dex = DexFileFactory.loadDexFile(inputDex, null)
+        val opcodes = dex.opcodes
 
         var googlePlayCount = 0; var adsCount = 0; var adsBooleanCount = 0; var urlsCount = 0
         var caAppPubCount = 0; var analyticsUrlCount = 0; var analyticsFieldCount = 0
@@ -457,8 +461,8 @@ object DexPatcher {
             inputDex.copyTo(outputDex, overwrite = true)
             return 0
         }
-        val opcodes = Opcodes.forApi(28)
-        val dex = DexFileFactory.loadDexFile(inputDex, opcodes)
+        val dex = DexFileFactory.loadDexFile(inputDex, null)
+        val opcodes = dex.opcodes
         val editsByClass = HashMap<String, MutableList<StubEdit>>()
         for (e in edits) editsByClass.getOrPut(e.className) { mutableListOf() }.add(e)
         var applied = 0
@@ -517,8 +521,8 @@ object DexPatcher {
             inputDex.copyTo(outputDex, overwrite = true)
             return 0
         }
-        val opcodes = Opcodes.forApi(28)
-        val dex = DexFileFactory.loadDexFile(inputDex, opcodes)
+        val dex = DexFileFactory.loadDexFile(inputDex, null)
+        val opcodes = dex.opcodes
         val byClass = HashMap<String, MutableList<CodeEdit>>()
         for (e in edits) byClass.getOrPut(e.className) { mutableListOf() }.add(e)
         var applied = 0
@@ -597,8 +601,7 @@ object DexPatcher {
     }
 
     private fun verifyCodeEdits(outputDex: File, edits: List<CodeEdit>, applied: Int): Int {
-        val opcodes = Opcodes.forApi(28)
-        val dex = DexFileFactory.loadDexFile(outputDex, opcodes)
+        val dex = DexFileFactory.loadDexFile(outputDex, null)
         val classMap = HashMap<String, org.jf.dexlib2.iface.ClassDef>()
         for (c in dex.classes) classMap[c.type] = c
         for (e in edits) {
@@ -1811,7 +1814,13 @@ fun patchPackageName(inputDex: File, outputDex: File, oldPackage: String, newPac
         val patchedImpl = method.implementation?.let { impl ->
             val instructionsList = impl.instructions.toList()
             val patchedInstructions = mutableListOf<org.jf.dexlib2.iface.instruction.Instruction>()
+            val patchedOrigins = mutableListOf<Int>()
             var skipNext = false
+
+            fun addPatched(instruction: org.jf.dexlib2.iface.instruction.Instruction, origin: Int) {
+                patchedInstructions.add(instruction)
+                patchedOrigins.add(origin)
+            }
 
             for (index in instructionsList.indices) {
                 if (skipNext) { skipNext = false; continue }
@@ -1827,7 +1836,7 @@ fun patchPackageName(inputDex: File, outputDex: File, oldPackage: String, newPac
                             val ref = prev.reference
                             if (ref is StringReference && ref.string.contains("com.android.vending.licensing")) {
                                 onGooglePlayPatch()
-                                patchedInstructions.add(createConstZeroInstruction(currentInstruction.registerA))
+                                addPatched(createConstZeroInstruction(currentInstruction.registerA), index)
                                 wasHandled = true
                             }
                         }
@@ -1847,9 +1856,9 @@ fun patchPackageName(inputDex: File, outputDex: File, oldPackage: String, newPac
                             }
                             if (!hasMoveResult) {
                                 onAdsPatch()
-                                patchedInstructions.add(ImmutableInstruction10x(Opcode.NOP))
-                                patchedInstructions.add(ImmutableInstruction10x(Opcode.NOP))
-                                patchedInstructions.add(ImmutableInstruction10x(Opcode.NOP))
+                                addPatched(ImmutableInstruction10x(Opcode.NOP), index)
+                                addPatched(ImmutableInstruction10x(Opcode.NOP), index)
+                                addPatched(ImmutableInstruction10x(Opcode.NOP), index)
                                 wasHandled = true
                             }
                         }
@@ -1864,11 +1873,11 @@ fun patchPackageName(inputDex: File, outputDex: File, oldPackage: String, newPac
                         if (CA_APP_PUB_PATTERN != null && CA_APP_PUB_PATTERN!!.containsMatchIn(s)) {
                             val newS = CA_APP_PUB_PATTERN!!.replace(s, CA_APP_PUB_REPLACEMENT)
                             onCaAppPubPatch()
-                            patchedInstructions.add(createConstStringInstruction(currentInstruction, newS))
+                            addPatched(createConstStringInstruction(currentInstruction, newS), index)
                             wasHandled = true
                         } else if (isAdUrlString(s)) {
                             onUrlPatch()
-                            patchedInstructions.add(createConstStringInstruction(currentInstruction, BLOCKED_HOST))
+                            addPatched(createConstStringInstruction(currentInstruction, BLOCKED_HOST), index)
                             wasHandled = true
                         }
                     }
@@ -1879,7 +1888,7 @@ fun patchPackageName(inputDex: File, outputDex: File, oldPackage: String, newPac
                     val ref = (currentInstruction as ReferenceInstruction).reference
                     if (ref is StringReference && isAnalyticsString(ref.string)) {
                         onAnalyticsUrlPatch()
-                        patchedInstructions.add(createConstStringInstruction(currentInstruction, ANALYTICS_REPLACEMENT))
+                        addPatched(createConstStringInstruction(currentInstruction, ANALYTICS_REPLACEMENT), index)
                         wasHandled = true
                     }
                 }
@@ -1893,8 +1902,8 @@ fun patchPackageName(inputDex: File, outputDex: File, oldPackage: String, newPac
                             val nextRef = (next as ReferenceInstruction).reference
                             if (nextRef is StringReference && isSplitUrlFragment(nextRef.string) && nextRef.string != ref.string) {
                                 onAnalyticsUrlPatch()
-                                patchedInstructions.add(createConstStringInstruction(currentInstruction, ANALYTICS_REPLACEMENT))
-                                patchedInstructions.add(createConstStringInstruction(next, ANALYTICS_REPLACEMENT))
+                                addPatched(createConstStringInstruction(currentInstruction, ANALYTICS_REPLACEMENT), index)
+                                addPatched(createConstStringInstruction(next, ANALYTICS_REPLACEMENT), index + 1)
                                 skipNext = true
                                 wasHandled = true
                             }
@@ -1911,8 +1920,8 @@ fun patchPackageName(inputDex: File, outputDex: File, oldPackage: String, newPac
                             val next = instructionsList[index + 1]
                             if (next.opcode.name == "move-result" && next is OneRegisterInstruction) {
                                 onGpServicesPatch()
-                                patchedInstructions.add(currentInstruction)
-                                patchedInstructions.add(createConstZeroInstruction(next.registerA))
+                                addPatched(currentInstruction, index)
+                                addPatched(createConstZeroInstruction(next.registerA), index + 1)
                                 skipNext = true
                                 wasHandled = true
                             }
@@ -1928,8 +1937,8 @@ fun patchPackageName(inputDex: File, outputDex: File, oldPackage: String, newPac
                             val next = instructionsList[index + 1]
                             if (next.opcode.name == "move-result" && next is OneRegisterInstruction) {
                                 onVpnPatch()
-                                patchedInstructions.add(currentInstruction)
-                                patchedInstructions.add(createConstZeroInstruction(next.registerA))
+                                addPatched(currentInstruction, index)
+                                addPatched(createConstZeroInstruction(next.registerA), index + 1)
                                 skipNext = true
                                 wasHandled = true
                             }
@@ -1947,24 +1956,89 @@ fun patchPackageName(inputDex: File, outputDex: File, oldPackage: String, newPac
                     if (isInstallerCall && index + 1 < instructionsList.size) {
                         val next = instructionsList[index + 1]
                         if (next.opcode.name == "move-result-object" && next is OneRegisterInstruction) {
-                            onInstallerCheckPatch()
-                            patchedInstructions.add(createConstStringForRegister(next.registerA, "com.android.vending"))
-                            patchedInstructions.add(ImmutableInstruction10x(Opcode.NOP))
-                            patchedInstructions.add(ImmutableInstruction10x(Opcode.NOP))
-                            skipNext = true
-                            wasHandled = true
+                                onInstallerCheckPatch()
+                                addPatched(createConstStringForRegister(next.registerA, "com.android.vending"), index)
+                                addPatched(ImmutableInstruction10x(Opcode.NOP), index)
+                                addPatched(ImmutableInstruction10x(Opcode.NOP), index)
+                                skipNext = true
+                                wasHandled = true
                         }
                     }
                 }
 
-                if (!wasHandled) patchedInstructions.add(currentInstruction)
+                if (!wasHandled) addPatched(currentInstruction, index)
             }
 
             val newDebugItems = if (patchRemoveDebug && impl.debugItems.any()) { onDebugItemRemove(); emptyList() } else impl.debugItems
-            ImmutableMethodImplementation(impl.registerCount, patchedInstructions, impl.tryBlocks, newDebugItems)
+            val tryBlocks = remapTryBlocks(instructionsList, patchedInstructions, patchedOrigins, impl.tryBlocks)
+            ImmutableMethodImplementation(impl.registerCount, patchedInstructions, tryBlocks, newDebugItems)
         }
 
         return ImmutableMethod(method.definingClass, method.name, method.parameters, method.returnType, method.accessFlags, method.annotations, method.hiddenApiRestrictions, patchedImpl)
+    }
+
+    /**
+     * Пересчитывает адреса try/catch после вставки или замены инструкций.
+     *
+     * В dex адреса try-блоков заданы в code units. Если заменить const/16 на
+     * const/4 или вставить const-string, старые адреса начинают указывать
+     * внутрь инструкции — ART отклоняет такой класс с VerifyError.
+     */
+    private fun remapTryBlocks(
+        original: List<Instruction>,
+        patched: List<Instruction>,
+        origins: List<Int>,
+        tryBlocks: List<TryBlock<out ExceptionHandler>>
+    ): List<ImmutableTryBlock> {
+        if (tryBlocks.isEmpty()) return emptyList()
+
+        val originalStarts = IntArray(original.size + 1)
+        var originalOffset = 0
+        for (i in original.indices) {
+            originalStarts[i] = originalOffset
+            originalOffset += original[i].codeUnits
+        }
+        originalStarts[original.size] = originalOffset
+
+        val patchedStarts = IntArray(patched.size + 1)
+        var patchedOffset = 0
+        for (i in patched.indices) {
+            patchedStarts[i] = patchedOffset
+            patchedOffset += patched[i].codeUnits
+        }
+        patchedStarts[patched.size] = patchedOffset
+
+        val mapped = IntArray(original.size + 1) { -1 }
+        for (i in patched.indices) {
+            val origin = origins.getOrNull(i)?.coerceIn(0, original.size) ?: original.size
+            if (mapped[origin] == -1) mapped[origin] = patchedStarts[i]
+        }
+        mapped[original.size] = patchedStarts[patched.size]
+        for (i in original.size - 1 downTo 0) {
+            if (mapped[i] == -1) mapped[i] = mapped[i + 1]
+        }
+
+        val indexByStart = HashMap<Int, Int>(originalStarts.size)
+        for (i in originalStarts.indices) indexByStart[originalStarts[i]] = i
+
+        fun mapAddress(address: Int): Int? {
+            val index = indexByStart[address] ?: return null
+            val result = mapped[index]
+            return if (result >= 0) result else null
+        }
+
+        return tryBlocks.mapNotNull { block ->
+            val start = mapAddress(block.startCodeAddress) ?: return@mapNotNull null
+            val end = mapAddress(block.startCodeAddress + block.codeUnitCount) ?: return@mapNotNull null
+            if (end <= start) return@mapNotNull null
+
+            val handlers = ArrayList<ImmutableExceptionHandler>(block.exceptionHandlers.size)
+            for (handler in block.exceptionHandlers) {
+                val handlerAddress = mapAddress(handler.handlerCodeAddress) ?: return@mapNotNull null
+                handlers.add(ImmutableExceptionHandler(handler.exceptionType, handlerAddress))
+            }
+            ImmutableTryBlock(start, end - start, handlers)
+        }
     }
 
     private fun createConstStringForRegister(register: Int, newString: String): Instruction {

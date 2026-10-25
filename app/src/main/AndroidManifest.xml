@@ -42,6 +42,7 @@
         </activity>
 
         <activity android:name=".FileBrowserActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
+        <activity android:name=".FolderPickerActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
         <activity android:name=".ApkOperationsActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
         <activity android:name=".ConversionActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />
         <activity android:name=".ExtractActivity" android:exported="false" android:theme="@style/Theme.LazyModification" />

@@ -1,12 +1,14 @@
 package com.example.lazymodification.utils
 
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Base64
 import android.util.Log
+import com.android.apksig.ApkVerifier
 import com.reandroid.apk.ApkModule
 import com.reandroid.arsc.chunk.xml.ResXmlElement
 import org.jf.dexlib2.DexFileFactory
-import org.jf.dexlib2.Opcodes
 import org.jf.dexlib2.iface.ClassDef
 import org.jf.dexlib2.iface.Field
 import org.jf.dexlib2.iface.Method
@@ -62,18 +64,21 @@ object SignatureKiller {
         workDir: File,
         log: (String) -> Unit
     ): Result {
-        // 1) Оригинальный сертификат
-        val cert = extractSignerCert(originalApk)
-            ?: return Result(false, "не удалось прочитать оригинальный сертификат из подписи")
-        val certB64 = Base64.encodeToString(cert, Base64.NO_WRAP)
-        log("🛡️ Сертификат извлечён (${cert.size} байт)")
-
-        // 2) Пакет и класс Application из манифеста
+        // 1) Пакет и класс Application из манифеста
         val info = readManifestInfo(originalApk)
             ?: return Result(false, "не удалось прочитать AndroidManifest.xml")
         val pkgName = info.first ?: return Result(false, "в манифесте не найден package")
         val appCls = info.second
             ?: return Result(false, "у приложения нет своего класса Application — пока не поддержано")
+
+        // 2) Оригинальный сертификат: из APK, иначе из установленного приложения.
+        // APK из APKS/старых сборок иногда приходит без APK Signing Block, но
+        // установленная копия хранит исходную подпись.
+        val cert = extractSignerCert(originalApk) ?: installedSignerCert(context, pkgName)
+            ?: return Result(false, "не удалось прочитать оригинальный сертификат из подписи")
+        val certB64 = Base64.encodeToString(cert, Base64.NO_WRAP)
+        log("🛡️ Сертификат получен (${cert.size} байт)")
+
         val appType = "L" + appCls.replace('.', '/') + ";"
 
         // 3) Цепочка наследования: быстрый бинарный скан dex (dexlib2 — только fallback)
@@ -122,7 +127,7 @@ object SignatureKiller {
                 val superOf = HashMap<String, String>()
                 val dexOf = HashMap<String, String>()
                 for ((name, file) in dexMap) {
-                    val dex = DexFileFactory.loadDexFile(file, Opcodes.forApi(28))
+                    val dex = DexFileFactory.loadDexFile(file, null)
                     for (cd in dex.classes) {
                         superOf[cd.type] = cd.superclass ?: ""
                         dexOf[cd.type] = name
@@ -182,6 +187,42 @@ object SignatureKiller {
 
     /** X.509 сертификат (DER) первого подписанта из APK Signing Block (v3/v2), иначе из v1. */
     fun extractSignerCert(apk: File): ByteArray? {
+        extractSignerCertManually(apk)?.let { return it }
+
+        // apksig умеет v2/v3/v3.1 и корректно разбирает блоки, которые
+        // ручной сканер пропускает (например, APK от другого упаковщика).
+        return try {
+            ApkVerifier.Builder(apk).build().verify()
+                .signerCertificates
+                .firstOrNull()
+                ?.encoded
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    private fun installedSignerCert(context: Context, packageName: String): ByteArray? {
+        return try {
+            val pm = context.packageManager
+            val info = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                pm.getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getPackageInfo(packageName, PackageManager.GET_SIGNATURES)
+            }
+            val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                info.signingInfo?.apkContentsSigners
+            } else {
+                @Suppress("DEPRECATION")
+                info.signatures
+            }
+            signatures?.firstOrNull()?.toByteArray()
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    private fun extractSignerCertManually(apk: File): ByteArray? {
         val block = try { SigningUtils.extractSigningBlock(apk) } catch (t: Throwable) { null }
         if (block != null) {
             val starts = ArrayList<Int>(2)
@@ -294,8 +335,9 @@ object SignatureKiller {
 
     /** Перезаписывает dex, заменяя суперкласс [appType] на движок. false = не найден/не подходит. */
     private fun patchSuperclass(dexFile: File, appType: String, outFile: File): Boolean {
-        val opcodes = Opcodes.forApi(28)
-        val dex = DexFileFactory.loadDexFile(dexFile, opcodes)
+        // Не фиксируем API 28: в Compose-приложениях встречаются конструкции
+        // новее, и запись dex с чужими opcodes может испортить try/catch.
+        val dex = DexFileFactory.loadDexFile(dexFile, null)
         var found = false
         val classes = ArrayList<ClassDef>()
         for (cd in dex.classes) {
@@ -312,8 +354,14 @@ object SignatureKiller {
             }
         }
         if (!found) return false
-        DexFileFactory.writeDexFile(outFile.absolutePath, ImmutableDexFile(opcodes, classes))
-        return true
+        DexFileFactory.writeDexFile(outFile.absolutePath, ImmutableDexFile(dex.opcodes, classes))
+        DexPatcher.normalizeDexVersion(dexFile, outFile)
+        return try {
+            DexFileFactory.loadDexFile(outFile, null)
+            true
+        } catch (_: Throwable) {
+            false
+        }
     }
 
     /** Собирает итоговый dex движка: подставляет сертификат и имя пакета в шаблон. */
@@ -322,8 +370,7 @@ object SignatureKiller {
         context.assets.open("killer/killer.dex").use { input ->
             template.outputStream().use { out -> input.copyTo(out) }
         }
-        val opcodes = Opcodes.forApi(28)
-        val dex = DexFileFactory.loadDexFile(template, opcodes)
+        val dex = DexFileFactory.loadDexFile(template, null)
         val classes = ArrayList<ClassDef>()
         for (cd in dex.classes) {
             val nsf = ArrayList<Field>()
@@ -352,7 +399,7 @@ object SignatureKiller {
                 nsf, cd.instanceFields, ndm, nvm
             ))
         }
-        DexFileFactory.writeDexFile(outDex.absolutePath, ImmutableDexFile(opcodes, classes))
+        DexFileFactory.writeDexFile(outDex.absolutePath, ImmutableDexFile(dex.opcodes, classes))
         template.delete()
         return true
     }

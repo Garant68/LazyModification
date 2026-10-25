@@ -23,6 +23,8 @@ import com.example.lazymodification.utils.SignatureConfig
 import com.example.lazymodification.utils.SigningUtils
 import com.example.lazymodification.utils.ApkUtils
 import com.example.lazymodification.utils.DexPatcher
+import com.example.lazymodification.utils.StorageRoots
+import com.example.lazymodification.utils.WorkingFolderHelper
 import com.reandroid.apk.ApkModule
 import com.reandroid.xml.XMLFactory
 import java.io.File
@@ -75,9 +77,16 @@ class CloneFileBrowserActivity : AppCompatActivity() {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                val rootPath = Environment.getExternalStorageDirectory().absolutePath
-                if (currentDir.absolutePath != rootPath && currentDir.parentFile != null) {
-                    currentDir = currentDir.parentFile!!
+                if (!::currentDir.isInitialized) {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                    return
+                }
+                val parent = currentDir.parentFile
+                if (!StorageRoots.isRoot(this@CloneFileBrowserActivity, currentDir) &&
+                    parent != null && parent.canRead()
+                ) {
+                    currentDir = parent
                     loadFiles()
                 } else {
                     isEnabled = false
@@ -130,7 +139,8 @@ class CloneFileBrowserActivity : AppCompatActivity() {
     }
 
     private fun initBrowser() {
-        currentDir = Environment.getExternalStorageDirectory()
+        currentDir = WorkingFolderHelper.getFolder(this)
+            ?: Environment.getExternalStorageDirectory()
         loadFiles()
 
         listView.setOnItemClickListener { _, _, position, _ ->

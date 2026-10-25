@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/tvFolderTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/folder_picker_title"
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="22sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnFolderUp"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="56dp"
+            android:layout_height="48dp"
+            android:contentDescription="@string/folder_up"
+            android:text="↑"
+            android:textSize="20sp" />
+
+        <TextView
+            android:id="@+id/tvFolderPath"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:ellipsize="middle"
+            android:maxLines="2"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="12sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnStorageRoots"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:text="@string/storage_roots"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="12dp"
+        android:layout_weight="1">
+
+        <ListView
+            android:id="@+id/lvFolders"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fastScrollEnabled="true"
+            android:fastScrollAlwaysVisible="true"
+            android:fastScrollThumbDrawable="@drawable/scroll_thumb" />
+
+        <TextView
+            android:id="@+id/tvFoldersEmpty"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="@string/folders_empty"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="16sp"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnSelectFolder"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="12dp"
+        android:text="@string/select_this_folder"
+        android:textSize="16sp" />
+
+</LinearLayout>

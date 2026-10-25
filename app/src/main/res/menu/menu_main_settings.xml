@@ -39,6 +39,10 @@
         </menu>
     </item>
     <item
+        android:id="@+id/action_working_folder"
+        android:icon="@drawable/ic_folder"
+        android:title="@string/working_folder" />
+    <item
         android:id="@+id/action_save_folder"
         android:icon="@drawable/ic_folder"
         android:title="@string/save_folder">
