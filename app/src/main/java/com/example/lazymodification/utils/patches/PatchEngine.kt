@@ -14,9 +14,11 @@ data class PatchStats(var matches: Int = 0, var added: Int = 0, var removed: Int
 }
 
 /** Pure JVM rule interpreter. All writes are confined to a disposable decoded APK project. */
-class PatchEngine(private val root: File, private val metadata: PatchMetadata,
+class PatchEngine(rootDir: File, private val metadata: PatchMetadata,
                   private val log: (String) -> Unit = {},
                   private val executeDex: ((PatchRule, ZipFile, File) -> Unit)? = null) {
+    /** Корень проекта в каноническом виде: пути сравниваются одинаково при любом рабочем каталоге. */
+    private val root: File = rootDir.canonicalFile
     private val variablePattern = Regex("\\$\\{([A-Za-z_][A-Za-z_0-9]*)[}]")
     private val variables = mutableMapOf("PACKAGE" to metadata.packageName,
         "APPLICATION" to metadata.application, "LAUNCHER_ACTIVITY" to metadata.launchers.firstOrNull().orEmpty())

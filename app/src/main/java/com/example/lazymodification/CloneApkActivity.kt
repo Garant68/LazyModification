@@ -19,6 +19,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.example.lazymodification.utils.SignatureConfig
 import com.example.lazymodification.utils.ApkUtils
+import com.example.lazymodification.utils.CloneResourcePatcher
 import com.example.lazymodification.utils.DexPatcher
 import com.example.lazymodification.utils.SigningUtils
 import com.google.android.material.button.MaterialButton
@@ -219,10 +220,19 @@ class CloneApkActivity : AppCompatActivity() {
                 apkModule.close()
                 Log.d(TAG, "✅ APK записан: ${tempModified.length()} bytes")
 
+                // Binary XML хранит имена custom View отдельно от dex.
+                val tempResourcesPatched = File(cacheDir, "temp_clone_resources.apk")
+                tempResourcesPatched.delete()
+                val xmlCount = CloneResourcePatcher.patch(
+                    tempModified, tempResourcesPatched, originalPackage, newPackage
+                )
+                tempModified.delete()
+                Log.d(TAG, "✅ XML обновлён: $xmlCount файлов")
+
                 // ✅ Патчим DEX: заменяем имя пакета в строках
                 val dexDir = File(cacheDir, "clone_dex")
                 dexDir.mkdirs()
-                val dexFiles = ApkUtils.extractAllDex(tempModified, dexDir)
+                val dexFiles = ApkUtils.extractAllDex(tempResourcesPatched, dexDir)
                 val patchedDexMap = HashMap<String, File>()
                 var totalReplaced = 0
                 for (dex in dexFiles) {
@@ -236,8 +246,8 @@ class CloneApkActivity : AppCompatActivity() {
 
                 val tempRepacked = File(cacheDir, "temp_clone_repacked.apk")
                 tempRepacked.delete()
-                ApkUtils.repackApkWithMultipleDex(tempModified, patchedDexMap, tempRepacked)
-                tempModified.delete()
+                ApkUtils.repackApkWithMultipleDex(tempResourcesPatched, patchedDexMap, tempRepacked)
+                tempResourcesPatched.delete()
                 Log.d(TAG, "✅ APK перепакован: ${tempRepacked.length()} bytes")
 
                 val finalFile = if (config.noSign) {

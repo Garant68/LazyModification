@@ -22,16 +22,32 @@ import java.util.zip.ZipFile
 
 /** Bridges the format interpreter to DEX/AXML and the existing align/sign/save pipeline. */
 object ApkPatchRunner {
+    private val dexNameRegex = Regex("classes(?:[2-9]|[1-9][0-9]+)?\\.dex")
+
     fun apply(context: Context?, input: File, archive: File, output: File, directory: File,
               log: (String) -> Unit = {}, progress: (Float, String) -> Unit = { _, _ -> }): PatchStats {
         directory.mkdirs()
+        val isLmPatch = LmPatchContainer.isLmPatch(archive)
         val patchArchive = if (archive.extension.equals("txt", true)) File(directory, "imported.zip").also {
             PatchFormat.writeZip(it, archive.readText(), emptyMap())
+        } else if (isLmPatch) {
+            LmPatchContainer.extractPayload(archive, File(directory, "lmpatch_payload"))
         } else archive
         val document = PatchFormat.read(patchArchive)
+        val requiredMethodRules = if (isLmPatch) {
+            document.rules.count { it.type == "MATCH_REPLACE" }
+        } else 0
+        // Для method-патча цели уже записаны как smali/...; разбираем только
+        // эти классы, а не все dex выбранного APK.
+        val selectiveSmali = if (document.needsSmali) selectiveSmaliTargets(document) else null
+        val methodOnly = isLmPatch && selectiveSmali != null && !document.needsResources &&
+            document.rules.isNotEmpty() &&
+            document.rules.all { it.type in setOf("MATCH_REPLACE", "MATCH_ASSIGN", "MATCH_GOTO") }
         var project = File(directory, "project")
         val originalNames = linkedSetOf<String>()
-        val cached = if (context != null && document.needsSmali) {
+        // Для точечного .lmpatch полный кэш smali только вредит: его копирование
+        // и повторный хеш занимают больше времени, чем разбор двух классов.
+        val cached = if (context != null && document.needsSmali && selectiveSmali == null) {
             try { ApkProjectCache.load(context, input, directory) } catch (_: Throwable) { null }
         } else null
         val useCache = cached != null &&
@@ -53,6 +69,9 @@ object ApkPatchRunner {
                     val entry = entries.nextElement()
                     if (entry.isDirectory) continue
                     if (!originalNames.add(entry.name)) throw PatchException("Повтор ZIP-записи ${entry.name}")
+                    // Для чистого method-патча ресурсы и assets не нужны:
+                    // FastZipRepack возьмёт их прямо из исходного APK.
+                    if (methodOnly && !dexNameRegex.matches(entry.name)) continue
                     val file = PatchFormat.child(project, entry.name)
                     file.parentFile?.mkdirs()
                     zip.getInputStream(entry).use { src -> file.outputStream().use { src.copyTo(it) } }
@@ -106,7 +125,7 @@ object ApkPatchRunner {
             dexApis.putAll(cached!!.dexApis)
             beforeSmali.putAll(cached.beforeSmali)
         } else if (decodeSmali) {
-            val dexFiles = project.listFiles().orEmpty().filter { it.name.matches(Regex("classes(?:[2-9]|[1-9][0-9]+)?\\.dex")) }.sortedBy { it.name }
+            val dexFiles = project.listFiles().orEmpty().filter { dexNameRegex.matches(it.name) }.sortedBy { it.name }
             for ((index, dex) in dexFiles.withIndex()) {
                 progress(0.08f + 0.22f * index / dexFiles.size.coerceAtLeast(1), dex.name)
                 val name = if (dex.name == "classes.dex") "smali" else "smali_" + dex.nameWithoutExtension
@@ -114,12 +133,26 @@ object ApkPatchRunner {
                 val file = DexFileFactory.loadDexFile(dex, null)
                 dexApis[name] = file.opcodes.api
                 val options = BaksmaliOptions().apply { apiLevel = file.opcodes.api; debugInfo = false; parameterRegisters = true }
-                if (!Baksmali.disassembleDexFile(file, dir, 2, options)) throw PatchException("Не удалось разобрать ${dex.name}")
+                val selected = if (selectiveSmali == null) null else selectedClasses(selectiveSmali, name, file)
+                if (selected != null && selected.isEmpty()) {
+                    dir.deleteRecursively()
+                    dexApis.remove(name)
+                    continue
+                }
+                val source = if (selected == null) file else object : DexFileIface {
+                    override fun getClasses(): Set<ClassDef> = LinkedHashSet(selected)
+                    override fun getOpcodes() = file.opcodes
+                }
+                if (!Baksmali.disassembleDexFile(source, dir, 2, options)) throw PatchException("Не удалось разобрать ${dex.name}")
                 beforeSmali[name] = hashes(dir, skipSmali = false)
             }
         }
-        val baseline = if (useCache) cached!!.baseline else hashes(project, skipSmali = true)
-        if (!useCache && context != null && document.needsSmali) {
+        val baseline = when {
+            useCache -> cached!!.baseline
+            methodOnly -> emptyMap()
+            else -> hashes(project, skipSmali = true)
+        }
+        if (!useCache && context != null && document.needsSmali && selectiveSmali == null) {
             try {
                 ApkProjectCache.save(context, input, project, resourceProject, originalNames, dexApis, beforeSmali, baseline)
                 log("Кэш разобранного APK сохранён — следующий патч будет быстрее")
@@ -158,7 +191,13 @@ object ApkPatchRunner {
         }.apply(document, patchArchive) { done, total ->
             progress(0.3f + 0.4f * done / total.coerceAtLeast(1), "${done.coerceAtMost(total)}/$total")
         }
-        val afterRules = hashes(project, skipSmali = true)
+        if (requiredMethodRules > 0 && stats.matches < requiredMethodRules) {
+            throw PatchException(
+                "Не все методы совпали со старой версией: " +
+                    "${stats.matches} из $requiredMethodRules. Патч не применён."
+            )
+        }
+        val afterRules = if (methodOnly) emptyMap() else hashes(project, skipSmali = true)
         stats.changedPaths += (baseline.keys + afterRules.keys).filter { baseline[it] != afterRules[it] }
         val folders = project.listFiles().orEmpty().filter { it.isDirectory && it.name.matches(Regex("smali(?:_classes[0-9]+)?")) }.sortedBy { it.name }
         for ((index, dir) in folders.withIndex()) {
@@ -274,10 +313,11 @@ object ApkPatchRunner {
         }
         val replacements = linkedMapOf<String, File>()
         val removed = linkedSetOf<String>()
-        val finalPaths = hashes(project, skipSmali = true)
+        val finalPaths = if (methodOnly) emptyMap() else hashes(project, skipSmali = true)
         ZipFile(input).use { zip ->
             originalNames.forEach { name ->
                 if (isSignature(name)) { removed += name; return@forEach }
+                if (methodOnly) return@forEach
                 val file = File(project, name)
                 if (!file.isFile) removed += name
                 else {
@@ -286,7 +326,13 @@ object ApkPatchRunner {
                 }
             }
         }
-        finalPaths.keys.filter { it !in originalNames && !isSignature(it) }.forEach { replacements[it] = File(project, it) }
+        if (methodOnly) {
+            stats.changedPaths.filter { it.endsWith(".dex") }.forEach { name ->
+                File(project, name).takeIf { it.isFile }?.let { replacements[name] = it }
+            }
+        } else {
+            finalPaths.keys.filter { it !in originalNames && !isSignature(it) }.forEach { replacements[it] = File(project, it) }
+        }
         if (replacements.isEmpty() && removed.all { isSignature(it) }) {
             input.copyTo(output, overwrite = true)
             stats.changedPaths.clear()
@@ -300,6 +346,43 @@ object ApkPatchRunner {
     private fun isSignature(name: String): Boolean = name == "stamp-cert-sha256" || name == "stamp-cert-hash" ||
         (name.startsWith("META-INF/") && '/' !in name.removePrefix("META-INF/") &&
             (name == "META-INF/MANIFEST.MF" || name.uppercase().endsWith(".SF") || name.uppercase().endsWith(".RSA") || name.uppercase().endsWith(".DSA") || name.uppercase().endsWith(".EC")))
+    /**
+     * Возвращает точные smali-файлы из MATCH/REMOVE-правил. null означает,
+     * что безопасно разобрать весь dex (широкие glob/скрипты/DEX-merge).
+     */
+    private fun selectiveSmaliTargets(document: PatchDocument): Set<String>? {
+        if (document.rules.any { it.type == "EXECUTE_DEX" || it.type == "MERGE" }) return null
+        val result = linkedSetOf<String>()
+        for (rule in document.rules) {
+            if (rule.type !in setOf("MATCH_REPLACE", "MATCH_ASSIGN", "MATCH_GOTO", "REMOVE_FILES", "ADD_FILES")) continue
+            val raw = rule.value("TARGET").trim()
+            if (raw.isEmpty()) continue
+            for (line in raw.lineSequence()) {
+                val target = line.trim().trimStart('/')
+                if (target.isEmpty() || target.startsWith("#") || !target.startsWith("smali")) continue
+                if (target.any { it == '*' || it == '?' } || '[' in target || "\${" in target) return null
+                if (rule.type in setOf("REMOVE_FILES", "ADD_FILES") && !target.endsWith(".smali")) return null
+                if (!target.endsWith(".smali")) return null
+                result += target
+            }
+        }
+        return result.ifEmpty { null }
+    }
+
+    private fun selectedClasses(
+        paths: Set<String>,
+        folder: String,
+        dex: DexFileIface
+    ): Set<ClassDef> {
+        val prefix = "$folder/"
+        val types = paths.asSequence()
+            .filter { it.startsWith(prefix) && it.endsWith(".smali") }
+            .map { "L" + it.removePrefix(prefix).removeSuffix(".smali") + ";" }
+            .toSet()
+        if (types.isEmpty()) return emptySet()
+        return dex.classes.filter { it.type in types }.toSet()
+    }
+
     private fun hashes(root: File, skipSmali: Boolean): Map<String, String> = root.walkTopDown().onEnter {
         !skipSmali || it == root || !it.name.matches(Regex("smali(?:_classes[0-9]+)?"))
     }.filter { it.isFile }.associate { it.relativeTo(root).invariantSeparatorsPath to it.inputStream().use(::hashStream) }

@@ -4,7 +4,9 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 import android.app.ProgressDialog
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
+import android.graphics.Typeface
 import android.util.Log
 import android.view.Gravity
 import android.view.View
@@ -21,13 +23,16 @@ import androidx.appcompat.app.AppCompatActivity
 import com.example.lazymodification.utils.ApkInspector
 import com.example.lazymodification.utils.DexPatcher
 import com.example.lazymodification.utils.DpiRemove
+import com.example.lazymodification.utils.FileSaver
 import com.example.lazymodification.utils.SignatureConfig
 import com.example.lazymodification.utils.SigningUtils
 import com.example.lazymodification.utils.copyText
+import com.example.lazymodification.utils.patches.PatchAutoOffer
 import com.example.lazymodification.utils.patches.PatchCompatibility
 import com.example.lazymodification.utils.patches.PatchDocument
 import com.example.lazymodification.utils.patches.PatchFiles
 import com.example.lazymodification.utils.patches.PatchFormat
+import com.example.lazymodification.utils.patches.LmPatchContainer
 import com.google.android.material.button.MaterialButton
 import com.reandroid.apk.ApkModule
 import java.io.File
@@ -73,6 +78,7 @@ class PatchActivity : AppCompatActivity() {
     private var selectedArchs: List<String> = emptyList()
     private var isLoadingArchs = false
     private val customPatches = arrayListOf<String>()
+    private var patchOfferShown = false
     private lateinit var customPatchSummary: TextView
     private val customPatchPicker = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) {
@@ -113,7 +119,7 @@ class PatchActivity : AppCompatActivity() {
                 pendingSignConfirm = null
             }
         } else {
-            Toast.makeText(this, getString(R.string.err_keystore_not_selected), Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, getString(R.string.err_keystore_not_selected), Toast.LENGTH_SHORT).show()
             pendingSignConfirm = null
         }
     }
@@ -160,12 +166,18 @@ class PatchActivity : AppCompatActivity() {
         btnPatch = findViewById(R.id.btnPatch)
         customPatchSummary = findViewById(R.id.customPatchSummary)
         savedInstanceState?.getStringArrayList("custom_patch_paths")?.filter { File(it).isFile }?.let { customPatches.addAll(it) }
+        patchOfferShown = savedInstanceState?.getBoolean("patch_offer_shown") ?: false
         findViewById<MaterialButton>(R.id.btnCustomPatches).setOnClickListener { customPatchPicker.launch(arrayOf("*/*")) }
         customPatchSummary.setOnClickListener {
             if (customPatches.isNotEmpty()) {
                 val names = customPatches.map { File(it).name }.toTypedArray()
                 MaterialAlertDialogBuilder(this).setTitle(R.string.custom_patch_selected).setItems(names) { _, index ->
-                    startActivity(Intent(this, PatchEditorActivity::class.java).putExtra(PatchEditorActivity.EXTRA_PATCH_PATH, customPatches[index]))
+                    val file = File(customPatches[index])
+                    if (LmPatchContainer.isLmPatch(file)) {
+                        showLmPatchInfo(file)
+                    } else {
+                        startActivity(Intent(this, PatchEditorActivity::class.java).putExtra(PatchEditorActivity.EXTRA_PATCH_PATH, file.path))
+                    }
                 }.show()
             }
         }
@@ -189,6 +201,7 @@ class PatchActivity : AppCompatActivity() {
         preloadArchs()
         setupCheckboxes()
         refreshCustomPatches()
+        offerFolderPatch()
         btnPatch.setOnClickListener {
             if (otherPatchesSelected()) {
                 showSigningDialog()
@@ -198,7 +211,48 @@ class PatchActivity : AppCompatActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putStringArrayList("custom_patch_paths", ArrayList(customPatches))
+        outState.putBoolean("patch_offer_shown", patchOfferShown)
         super.onSaveInstanceState(outState)
+    }
+
+    /**
+     * Ищет готовый патч для выбранного APK в Download/LazyModification/Патч.
+     * Если патч подходит по пакету и версии — предлагает применить его сразу.
+     */
+    private fun offerFolderPatch() {
+        if (patchOfferShown || customPatches.isNotEmpty()) return
+        val directory = FileSaver.patchDirectory()
+        Thread {
+            val found = try {
+                val info = packageManager.getPackageArchiveInfo(apkPath!!, 0)
+                val versionCode = if (Build.VERSION.SDK_INT >= 28)
+                    info?.longVersionCode?.toInt() else info?.versionCode
+                PatchAutoOffer.find(
+                    directory, info?.packageName, info?.versionName, versionCode,
+                    LmPatchContainer.EXTENSION
+                )
+            } catch (_: Throwable) {
+                emptyList()
+            }
+            if (found.isNotEmpty()) runOnUiThread { showPatchOffer(found) }
+        }.start()
+    }
+
+    private fun showPatchOffer(files: List<File>) {
+        if (isFinishing || isDestroyed) return
+        val patch = files.firstOrNull() ?: return
+        patchOfferShown = true
+        val names = "• " + patch.name
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.patch_found_title)
+            .setMessage(getString(R.string.patch_found_message, names))
+            .setPositiveButton(R.string.patch_found_apply) { _, _ ->
+                if (patch.path !in customPatches) customPatches.add(patch.path)
+                refreshCustomPatches()
+                if (otherPatchesSelected()) showSigningDialog()
+            }
+            .setNegativeButton(R.string.patch_found_no, null)
+            .show()
     }
 
     private fun refreshCustomPatches() {
@@ -217,6 +271,69 @@ class PatchActivity : AppCompatActivity() {
             if (hasCustomPatches) button.isChecked = false
         }
         updatePatchButtonState()
+    }
+
+    private fun showLmPatchInfo(file: File) {
+        Thread {
+            try {
+                val manifest = LmPatchContainer.readManifest(file)
+                runOnUiThread {
+                    MaterialAlertDialogBuilder(this)
+                        .setTitle(R.string.lm_patch_title)
+                        .setMessage(
+                            getString(
+                                R.string.lm_patch_info,
+                                file.name,
+                                manifest.targetPackage,
+                                manifest.baseVersionName.ifBlank { manifest.baseVersionCode.toString() },
+                                manifest.newVersionName.ifBlank { manifest.newVersionCode.toString() },
+                                manifest.methodRules,
+                                manifest.fileRules
+                            )
+                        )
+                        .setPositiveButton(android.R.string.ok, null)
+                        .setNeutralButton(R.string.lm_patch_view) { _, _ -> showLmPatchText(file) }
+                        .show()
+                }
+            } catch (t: Throwable) {
+                runOnUiThread {
+                    Toast.makeText(this, t.message ?: getString(R.string.custom_patch_read_error), Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
+    }
+
+    private fun showLmPatchText(file: File) {
+        val work = File(cacheDir, "lm_patch_view_${System.nanoTime()}").apply { mkdirs() }
+        Thread {
+            try {
+                val text = LmPatchContainer.readPatchText(file, work)
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    val content = TextView(this).apply {
+                        setText(text)
+                        typeface = Typeface.MONOSPACE
+                        setTextIsSelectable(true)
+                        setPadding(24, 16, 24, 16)
+                    }
+                    MaterialAlertDialogBuilder(this)
+                        .setTitle(R.string.lm_patch_view_title)
+                        .setView(ScrollView(this).apply { addView(content) })
+                        .setPositiveButton(android.R.string.ok, null)
+                        .setNeutralButton(R.string.copy_report) { _, _ ->
+                            copyText(getString(R.string.lm_patch_view_title), text)
+                            Toast.makeText(this, R.string.copy_done, Toast.LENGTH_SHORT).show()
+                        }
+                        .show()
+                }
+            } catch (t: Throwable) {
+                runOnUiThread {
+                    Toast.makeText(this, t.message ?: getString(R.string.custom_patch_read_error), Toast.LENGTH_LONG).show()
+                }
+            } finally {
+                work.deleteRecursively()
+            }
+        }.start()
     }
 
     private fun preloadLocales() {
@@ -318,7 +435,6 @@ class PatchActivity : AppCompatActivity() {
         checkBoxRemoveDpi.setToggleCheckedStateOnClick(true)
         checkBoxRemoveLibs.setToggleCheckedStateOnClick(true)
         checkBoxOptimize.setToggleCheckedStateOnClick(true)
-        checkBoxOptimize.isChecked = true
 
         for (b in listOf(
             checkBoxGooglePlay, checkBoxRemoveAds, checkBoxRemoveAnalytics, checkBoxRemoveGPServices,

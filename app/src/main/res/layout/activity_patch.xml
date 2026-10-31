@@ -66,7 +66,6 @@
             android:textSize="16sp"
             app:icon="@drawable/ic_tools" />
 
-
         <TextView
             android:id="@+id/customPatchSummary"
             android:layout_width="match_parent"

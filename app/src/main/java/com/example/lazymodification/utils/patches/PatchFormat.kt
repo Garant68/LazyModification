@@ -4,6 +4,7 @@ import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.util.zip.ZipEntry
+import java.util.zip.Deflater
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
 
@@ -39,7 +40,7 @@ object PatchFormat {
     private val headers = setOf("MIN_ENGINE_VER", "AUTHOR", "PACKAGE",
         "VERSION_NAME", "MIN_VERSION_CODE", "MAX_VERSION_CODE")
     private val keys = setOf("NAME", "TARGET", "SOURCE", "EXTRACT", "MATCH", "REGEX", "DOTALL",
-        "REPLACE", "ASSIGN", "GOTO", "SCRIPT", "SMALI_NEEDED", "MAIN_CLASS", "ENTRANCE", "PARAM", "INTERFACE_VERSION")
+        "MATCH_SHA256", "REPLACE", "ASSIGN", "GOTO", "SCRIPT", "SMALI_NEEDED", "MAIN_CLASS", "ENTRANCE", "PARAM", "INTERFACE_VERSION")
     const val MAX_TEXT = 4 * 1024 * 1024
 
     fun parse(raw: String): PatchDocument {
@@ -153,6 +154,7 @@ object PatchFormat {
     fun writeZip(file: File, text: String, payloads: Map<String, File>) {
         parse(text)
         ZipOutputStream(file.outputStream().buffered()).use { zip ->
+            zip.setLevel(Deflater.BEST_COMPRESSION)
             zip.putNextEntry(ZipEntry("patch.txt")); zip.write(text.toByteArray(Charsets.UTF_8)); zip.closeEntry()
             payloads.forEach { (name, source) ->
                 validatePath(name)

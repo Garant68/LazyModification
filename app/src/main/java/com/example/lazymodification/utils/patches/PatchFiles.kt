@@ -46,6 +46,7 @@ object PatchFiles {
     }
 
     private fun normalizeImported(file: File, folder: File): File {
+        if (LmPatchContainer.isLmPatch(file)) return file
         val document = PatchFormat.read(file)
         if (file.extension.equals("txt", true)) {
             val zip = File(folder, file.nameWithoutExtension + ".zip")

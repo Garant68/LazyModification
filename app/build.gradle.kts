@@ -16,7 +16,7 @@ android {
         minSdk = 21
         targetSdk = 35
         versionCode = 129
-        versionName = "1.28"
+        versionName = "1.29"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -90,8 +90,14 @@ dependencies {
 
     // ✅ Testing
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     // ✅ BouncyCastle (поддержка JKS keystore на Android)
     implementation("org.bouncycastle:bcprov-jdk15to18:1.78")
+}
+
+// Тесты разбирают реальные APK — воркеру нужен запас памяти.
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    maxHeapSize = "2g"
 }

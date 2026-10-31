@@ -27,6 +27,14 @@
             android:fastScrollEnabled="true"
             android:fastScrollAlwaysVisible="true"
             android:fastScrollThumbDrawable="@drawable/scroll_thumb" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnMakePatch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:enabled="false"
+            android:text="@string/patch_generate"
+            android:visibility="gone" />
     </LinearLayout>
 
     <ProgressBar
