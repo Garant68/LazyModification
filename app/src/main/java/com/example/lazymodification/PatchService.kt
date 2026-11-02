@@ -93,6 +93,7 @@ class PatchService : Service() {
     private var stageBaseW = 0f
     private var stageTotalW = 1f
     private var lastOverall = -1
+    private var lastSentStageIdx = Int.MIN_VALUE
     private var runActive = false
     private var completedPath: String? = null
     private var completedPkg: String? = null
@@ -131,15 +132,15 @@ class PatchService : Service() {
         }
 
         if (intent?.action == ACTION_FLUSH_LOGS) {
-            synchronized(logBuffer) {
-                logBuffer.forEach { (msg, type) ->
+            val snapshot = synchronized(logBuffer) {
+                logBuffer.takeLast(200).also { logBuffer.clear() }
+            }
+            snapshot.forEach { (msg, type) ->
                     val i = Intent("PATCH_LOG").apply {
                         putExtra("LOG_MESSAGE", msg)
                         putExtra("LOG_TYPE", type)
                     }
                     LocalBroadcastManager.getInstance(this).sendBroadcast(i)
-                }
-                logBuffer.clear()
             }
             return START_NOT_STICKY
         }
@@ -290,6 +291,8 @@ class PatchService : Service() {
         val w = stageWeights.getOrElse(stageIdx) { 1f }
         val done = stageBaseW + w * fraction.coerceIn(0f, 1f)
         val overall = if (stageTotalW > 0f) (done / stageTotalW * 100f).toInt().coerceIn(0, 100) else 0
+        if (stageIdx == lastSentStageIdx && overall == lastOverall && detail == lastBcDetail) return
+        lastSentStageIdx = stageIdx
         if (overall > lastOverall) lastOverall = overall
         broadcastStage(lastOverall, stageIdx + 1, n, stageNames[stageIdx], detail)
     }
@@ -1074,7 +1077,10 @@ class PatchService : Service() {
 
     private fun sendLog(message: String, type: String) {
         Log.d(TAG, "[$type] $message")
-        synchronized(logBuffer) { logBuffer.add(message to type) }
+        synchronized(logBuffer) {
+            logBuffer.add(message to type)
+            if (logBuffer.size > 500) logBuffer.removeAt(0)
+        }
         LocalBroadcastManager.getInstance(this).sendBroadcast(
             Intent("PATCH_LOG").apply {
                 putExtra("LOG_MESSAGE", message)

@@ -35,16 +35,20 @@ data class PatchDocument(val text: String, val author: String, val packagePatter
 
 /** APK Editor/PCompiler text format. Payload indentation, comments and empty REPLACE are preserved. */
 object PatchFormat {
+    /** EXTRACT: SOURCE-маркер — брать файлы прямо из payload.zip, без вложенного tree.zip. */
+    const val SELF_PAYLOAD = "."
     val ruleTypes = listOf("MATCH_REPLACE", "ADD_FILES", "REMOVE_FILES", "MATCH_ASSIGN",
         "MATCH_GOTO", "GOTO", "MERGE", "EXECUTE_DEX", "DUMMY")
     private val headers = setOf("MIN_ENGINE_VER", "AUTHOR", "PACKAGE",
         "VERSION_NAME", "MIN_VERSION_CODE", "MAX_VERSION_CODE")
     private val keys = setOf("NAME", "TARGET", "SOURCE", "EXTRACT", "MATCH", "REGEX", "DOTALL",
         "MATCH_SHA256", "REPLACE", "ASSIGN", "GOTO", "SCRIPT", "SMALI_NEEDED", "MAIN_CLASS", "ENTRANCE", "PARAM", "INTERFACE_VERSION")
-    const val MAX_TEXT = 4 * 1024 * 1024
+    // 16 МБ: большие моды с тысячами методов/классов больше не упираются
+    // в прежний лимит 4 МБ. payload при этом остаётся отдельным ZIP.
+    const val MAX_TEXT = 16 * 1024 * 1024
 
     fun parse(raw: String): PatchDocument {
-        if (raw.length > MAX_TEXT) throw PatchException("patch.txt: размер больше 4 МБ")
+        if (raw.length > MAX_TEXT) throw PatchException("patch.txt: размер больше 16 МБ")
         val text = raw.removePrefix("\uFEFF").replace("\r\n", "\n").replace('\r', '\n')
         val lines = text.split('\n')
         val metadata = linkedMapOf<String, String>()

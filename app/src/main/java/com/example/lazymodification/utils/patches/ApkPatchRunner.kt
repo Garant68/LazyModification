@@ -23,6 +23,8 @@ import java.util.zip.ZipFile
 /** Bridges the format interpreter to DEX/AXML and the existing align/sign/save pipeline. */
 object ApkPatchRunner {
     private val dexNameRegex = Regex("classes(?:[2-9]|[1-9][0-9]+)?\\.dex")
+    private const val SMALL_CHANGED_SET = 300
+    private const val CHANGED_CHUNK_SIZE = 500
 
     fun apply(context: Context?, input: File, archive: File, output: File, directory: File,
               log: (String) -> Unit = {}, progress: (Float, String) -> Unit = { _, _ -> }): PatchStats {
@@ -191,11 +193,19 @@ object ApkPatchRunner {
         }.apply(document, patchArchive) { done, total ->
             progress(0.3f + 0.4f * done / total.coerceAtLeast(1), "${done.coerceAtMost(total)}/$total")
         }
-        if (requiredMethodRules > 0 && stats.matches < requiredMethodRules) {
+        val methodMissTolerance = if (requiredMethodRules >= 1000) 10 else 0
+        if (requiredMethodRules > 0 && stats.matches < requiredMethodRules - methodMissTolerance) {
+            if (stats.unmatchedRules.isNotEmpty()) {
+                log("Не совпали правила: " + stats.unmatchedRules.take(5).joinToString(", "))
+            }
             throw PatchException(
                 "Не все методы совпали со старой версией: " +
                     "${stats.matches} из $requiredMethodRules. Патч не применён."
             )
+        }
+        val methodMisses = (requiredMethodRules - stats.matches).coerceAtLeast(0)
+        if (methodMisses in 1..methodMissTolerance) {
+            log("Патч применён с предупреждением: не совпало $methodMisses из $requiredMethodRules method-правил")
         }
         val afterRules = if (methodOnly) emptyMap() else hashes(project, skipSmali = true)
         stats.changedPaths += (baseline.keys + afterRules.keys).filter { baseline[it] != afterRules[it] }
@@ -214,7 +224,10 @@ object ApkPatchRunner {
 
             // Reassemble only changed classes and merge them into the original DEX.
             // A full smali->dex rebuild of a large APK needs hundreds of MB and can OOM.
-            val changedDir = File(directory, "changed_${dir.name}").apply { mkdirs() }
+            val changedDir = File(directory, "changed_${dir.name}").apply {
+                deleteRecursively()
+                mkdirs()
+            }
             val removedTypes = linkedSetOf<String>()
             var changedFiles = 0
             changedPaths.forEach { path ->
@@ -227,6 +240,20 @@ object ApkPatchRunner {
                 } else if (path.endsWith(".smali")) {
                     removedTypes += "L" + path.removeSuffix(".smali") + ";"
                 }
+            }
+
+            if (changedFiles > SMALL_CHANGED_SET) {
+                // A whole-file .lmpatch can replace thousands of classes at once.
+                // Assembling them into one DEX overflows the 16-bit method index
+                // (Unsigned short value out of range: 65561).  Keep the original
+                // DEX for unchanged classes and put the replacements into small
+                // additional classesN.dex files instead.
+                rebuildLargeChangedFolder(
+                    project, directory, dir, dexName, changedDir, removedTypes,
+                    dexApis[dir.name] ?: dexApis["smali"] ?: 23, stats, log
+                )
+                changedDir.deleteRecursively()
+                continue
             }
 
             val changedDex = File(directory, "changed_${dir.name}.dex")
@@ -339,8 +366,136 @@ object ApkPatchRunner {
             return stats
         }
         progress(0.98f, "Перепаковка")
-        FastZipRepack.repack(input, replacements, output, applyClean = false, remove = removed)
+        // Чистим служебные файлы (kotlin/, DebugProbesKt.bin и мусор в корне)
+        // так же, как это делает основной путь патчинга PatchService.
+        FastZipRepack.repack(input, replacements, output, applyClean = true, remove = removed)
         return stats
+    }
+
+    private fun rebuildLargeChangedFolder(
+        project: File,
+        directory: File,
+        sourceDir: File,
+        dexName: String,
+        changedDir: File,
+        removedTypes: Set<String>,
+        apiLevel: Int,
+        stats: PatchStats,
+        log: (String) -> Unit
+    ) {
+        val changedFiles = changedDir.walkTopDown()
+            .filter { it.isFile && it.extension == "smali" }
+            .map { it.relativeTo(changedDir).invariantSeparatorsPath }
+            .sorted()
+            .toList()
+        if (changedFiles.isEmpty()) return
+
+        val parts = assembleChangedDexParts(
+            changedDir, File(directory, "parts_${sourceDir.name}"), changedFiles, apiLevel
+        )
+        val changedTypes = linkedSetOf<String>()
+        parts.forEach { part ->
+            DexFileFactory.loadDexFile(part, null).classes.mapTo(changedTypes) { it.type }
+        }
+        val replacedTypes = removedTypes + changedTypes
+        val originalFile = File(project, dexName)
+        val original = if (originalFile.isFile) DexFileFactory.loadDexFile(originalFile, null) else null
+        val keptClasses = original?.classes?.filter { it.type !in replacedTypes }.orEmpty()
+
+        if (keptClasses.isEmpty()) {
+            originalFile.delete()
+        } else if (original != null) {
+            val filtered = object : DexFileIface {
+                override fun getClasses(): Set<ClassDef> = LinkedHashSet(keptClasses)
+                override fun getOpcodes() = original.opcodes
+            }
+            val dest = File(directory, "built_$dexName")
+            dest.delete()
+            DexPool.writeTo(dest.absolutePath, filtered)
+            DexFileFactory.loadDexFile(dest, null)
+            dest.copyTo(originalFile, overwrite = true)
+        }
+        stats.changedPaths += dexName
+
+        val usedNames = linkedSetOf<String>()
+        var preferredName: String? = if (!originalFile.exists() && !File(project, dexName).exists()) dexName else null
+        parts.forEachIndexed { index, part ->
+            val name = preferredName?.also { preferredName = null } ?: nextDexName(project, usedNames)
+            part.copyTo(File(project, name), overwrite = true)
+            usedNames += name
+            stats.changedPaths += name
+            if (index == 0) {
+                log("Крупный набор изменённых классов разбит на ${parts.size} DEX-файлов")
+            }
+        }
+        parts.forEach { it.delete() }
+        File(directory, "parts_${sourceDir.name}").deleteRecursively()
+    }
+
+    private fun assembleChangedDexParts(
+        changedDir: File,
+        outputDir: File,
+        relativeFiles: List<String>,
+        apiLevel: Int
+    ): List<File> {
+        outputDir.deleteRecursively()
+        outputDir.mkdirs()
+        val result = mutableListOf<File>()
+        var nextPart = 0
+
+        fun tryAssemble(group: List<String>, label: String): List<File> {
+            if (group.isEmpty()) return emptyList()
+            val partDir = File(outputDir, "src_$label").apply { mkdirs() }
+            group.forEach { relative ->
+                val target = File(partDir, relative)
+                target.parentFile?.mkdirs()
+                File(changedDir, relative).copyTo(target, overwrite = true)
+            }
+            val dex = File(outputDir, "part_$label.dex")
+            dex.delete()
+            val assembled = try {
+                val options = SmaliOptions().apply {
+                    this.apiLevel = apiLevel
+                    jobs = 1
+                    verboseErrors = false
+                    outputDexFile = dex.absolutePath
+                }
+                Smali.assemble(options, partDir.absolutePath) &&
+                    DexFileFactory.loadDexFile(dex, null).classes.isNotEmpty()
+            } catch (_: Throwable) {
+                false
+            }
+            partDir.deleteRecursively()
+            if (assembled) return listOf(dex)
+            dex.delete()
+            if (group.size <= 1) {
+                throw PatchException("Не удалось собрать DEX для ${group.firstOrNull()}")
+            }
+            val middle = group.size / 2
+            return tryAssemble(group.subList(0, middle), "${label}a") +
+                tryAssemble(group.subList(middle, group.size), "${label}b")
+        }
+
+        var start = 0
+        while (start < relativeFiles.size) {
+            val end = (start + CHANGED_CHUNK_SIZE).coerceAtMost(relativeFiles.size)
+            val label = (nextPart++).toString()
+            result += tryAssemble(relativeFiles.subList(start, end), label)
+            start = end
+        }
+        return result
+    }
+
+    private fun nextDexName(project: File, used: MutableSet<String>): String {
+        var number = 2
+        while (true) {
+            val name = "classes$number.dex"
+            if (name !in used && !File(project, name).exists()) {
+                used += name
+                return name
+            }
+            number++
+        }
     }
 
     private fun isSignature(name: String): Boolean = name == "stamp-cert-sha256" || name == "stamp-cert-hash" ||

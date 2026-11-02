@@ -37,7 +37,7 @@
         android:layout_height="0dp"
         android:orientation="horizontal"
         app:layout_constraintTop_toBottomOf="@id/tvFileName"
-        app:layout_constraintBottom_toTopOf="@id/btnApply"
+        app:layout_constraintBottom_toTopOf="@id/btnContinueTranslate"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="12dp"
@@ -90,6 +90,43 @@
                         android:checked="true"/>
 
                 </RadioGroup>
+
+                <CheckBox
+                    android:id="@+id/cbDictionary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/use_dictionary"
+                    android:textSize="16sp"
+                    android:layout_marginTop="8dp"/>
+
+                <LinearLayout
+                    android:id="@+id/llDictionary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    android:layout_marginTop="6dp">
+
+                    <TextView
+                        android:id="@+id/tvDictionaryName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/dictionary_not_selected"
+                        android:textSize="13sp"
+                        android:textColor="?attr/colorOnSurfaceVariant"/>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnPickDictionary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="@string/choose_dictionary"
+                        android:textSize="15sp"
+                        app:icon="@android:drawable/ic_menu_search"
+                        app:iconGravity="textStart"
+                        app:iconPadding="8dp"/>
+
+                </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/llFastInput"
@@ -273,6 +310,38 @@
             android:layout_width="24dp"
             android:layout_height="match_parent" />
     </LinearLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnContinueTranslate"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/continue_translate"
+        android:textSize="17sp"
+        android:padding="14dp"
+        android:visibility="gone"
+        app:icon="@android:drawable/ic_menu_rotate"
+        app:iconGravity="textStart"
+        app:iconPadding="12dp"
+        app:layout_constraintBottom_toTopOf="@id/btnCreateDictionary"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="8dp"/>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnCreateDictionary"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/create_dictionary"
+        android:textSize="17sp"
+        android:padding="14dp"
+        android:visibility="gone"
+        app:icon="@android:drawable/ic_menu_edit"
+        app:iconGravity="textStart"
+        app:iconPadding="12dp"
+        app:layout_constraintBottom_toTopOf="@id/btnApply"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="8dp"/>
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnApply"

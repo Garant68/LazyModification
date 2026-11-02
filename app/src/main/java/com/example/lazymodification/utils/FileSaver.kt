@@ -18,6 +18,36 @@ object FileSaver {
         saveStream(context, file.inputStream(), fileName, "application/vnd.android.package-archive")
     }
 
+    /**
+     * Сохраняет словарь в формате MT Manager. Если на устройстве уже есть
+     * папка словарей MT, файл кладётся туда; иначе используется обычное
+     * место сохранения Lazy Modification.
+     */
+    fun saveDictionary(context: Context, file: File, fileName: String): String {
+        val folderUri = SaveFolderHelper.getUri(context)
+        val folder = if (folderUri != null) DocumentFile.fromTreeUri(context, folderUri) else null
+        if (folder != null && folder.canWrite()) {
+            file.inputStream().use { saveToFolder(context, folder, it, fileName, "application/xml") }
+            return (SaveFolderHelper.getDisplayName(context) ?: "Выбранная папка") + "/" + fileName
+        }
+
+        val mtFolder = File(Environment.getExternalStorageDirectory(), "Al/Android/Словарь")
+        if (mtFolder.isDirectory) {
+            try {
+                val target = File(mtFolder, fileName)
+                file.inputStream().use { input ->
+                    target.outputStream().use { output -> input.copyTo(output) }
+                }
+                return target.absolutePath
+            } catch (_: Throwable) {
+                // scoped storage или нет доступа — сохраняем через FileSaver
+            }
+        }
+
+        file.inputStream().use { saveStream(context, it, fileName, "application/xml") }
+        return "Download/LazyModification/$fileName"
+    }
+
     fun saveStream(context: Context, inputStream: InputStream, fileName: String, mimeType: String) {
         val folderUri = SaveFolderHelper.getUri(context)
         val folder = if (folderUri != null) DocumentFile.fromTreeUri(context, folderUri) else null

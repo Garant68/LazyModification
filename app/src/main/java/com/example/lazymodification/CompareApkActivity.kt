@@ -304,7 +304,7 @@ class CompareApkActivity : AppCompatActivity() {
                 stage(99, getString(R.string.patch_generate_saving))
                 val lmPatch = File(work, "generated_patch.lmpatch")
                 LmPatchContainer.write(lmPatch, result, zip)
-                val saved = FileSaver.savePatch(this, lmPatch, patchFileName(result))
+                val saved = FileSaver.savePatch(this, lmPatch, patchFileName(result, base, updated))
                 val methodRules = result.methodRules
                 val fileRules = result.fileRules
                 val removedRules = result.removedRules
@@ -328,10 +328,46 @@ class CompareApkActivity : AppCompatActivity() {
         }.start()
     }
 
-    private fun patchFileName(result: MethodPatchGenerator.Result): String {
-        val app = result.packageName.substringAfterLast('.')
+    private fun patchFileName(
+        result: MethodPatchGenerator.Result,
+        base: File,
+        updated: File
+    ): String {
+        // Не package.substringAfterLast('.'): у ru.mts.music.android это даёт
+        // бессмысленное "android". Сначала берём реальную метку приложения.
+        val app = archiveLabel(base)
+            .ifBlank { archiveLabel(updated) }
+            .ifBlank { fallbackAppName(result.packageName) }
         val from = result.versionName.ifBlank { result.versionCode.toString() }
-        return "${app}_${from}.lmpatch".replace(Regex("[^A-Za-z0-9._-]"), "_")
+        return "${safeNamePart(app)}_${safeNamePart(from)}.lmpatch"
+    }
+
+    private fun archiveLabel(apk: File): String {
+        return try {
+            val info = packageManager.getPackageArchiveInfo(apk.absolutePath, 0) ?: return ""
+            val appInfo = info.applicationInfo ?: return ""
+            // Без этих путей loadLabel() не всегда может открыть resources.arsc.
+            appInfo.sourceDir = apk.absolutePath
+            appInfo.publicSourceDir = apk.absolutePath
+            appInfo.loadLabel(packageManager).toString().trim()
+        } catch (_: Throwable) {
+            ""
+        }
+    }
+
+    private fun fallbackAppName(packageName: String): String {
+        val parts = packageName.split('.').filter { it.isNotBlank() }
+        if (parts.size >= 2 && parts.last().equals("android", ignoreCase = true)) {
+            return parts[parts.size - 2]
+        }
+        return parts.lastOrNull().orEmpty()
+    }
+
+    private fun safeNamePart(value: String): String {
+        return value
+            .replace(Regex("[^\\p{L}\\p{N}._-]+"), "_")
+            .trim('_', '.', '-')
+            .take(80)
     }
 
     private fun showPatchResult(

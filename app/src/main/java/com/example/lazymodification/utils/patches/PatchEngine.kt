@@ -9,7 +9,8 @@ import java.util.zip.ZipInputStream
 data class PatchMetadata(val packageName: String, val application: String = "",
                          val activities: List<String> = emptyList(), val launchers: List<String> = emptyList())
 data class PatchStats(var matches: Int = 0, var added: Int = 0, var removed: Int = 0,
-                      var scripts: Int = 0, val changedPaths: MutableSet<String> = linkedSetOf()) {
+                      var scripts: Int = 0, val changedPaths: MutableSet<String> = linkedSetOf(),
+                      val unmatchedRules: MutableList<String> = mutableListOf()) {
     val changed: Boolean get() = changedPaths.isNotEmpty() || scripts > 0
 }
 
@@ -28,6 +29,7 @@ class PatchEngine(rootDir: File, private val metadata: PatchMetadata,
         val packages = document.packagePattern.split('\n', ',').map { it.trim() }.filter { it.isNotEmpty() }
         if (packages.none { glob(it).matcher(metadata.packageName).matches() })
             throw PatchException("Патч для ${document.packagePattern}, выбран ${metadata.packageName}")
+        val logEvery = maxOf(1, document.rules.size / 100)
         val labels = document.rules.withIndex().filter { it.value.name.isNotEmpty() }.associate { it.value.name to it.index }
         ZipFile(archive).use { zip ->
             var pc = 0
@@ -57,7 +59,9 @@ class PatchEngine(rootDir: File, private val metadata: PatchMetadata,
                             stats.scripts++
                         }
                     }
-                    log("${pc + 1}/${document.rules.size} ${rule.type}${if (rule.name.isEmpty()) "" else " (${rule.name})"}: совпадений ${stats.matches}, файлов ${stats.changedPaths.size}")
+                    if (pc == 0 || pc == document.rules.size - 1 || pc % logEvery == 0 || rule.type != "MATCH_REPLACE") {
+                        log("${pc + 1}/${document.rules.size} ${rule.type}${if (rule.name.isEmpty()) "" else " (${rule.name})"}: совпадений ${stats.matches}, файлов ${stats.changedPaths.size}")
+                    }
                     pc = if (next == null) pc + 1 else labels[next] ?: throw PatchException("Неизвестная метка $next")
                 } catch (e: Exception) {
                     throw PatchException("Строка ${rule.line}, ${rule.type}: ${e.message ?: e.javaClass.simpleName}")
@@ -79,27 +83,64 @@ class PatchEngine(rootDir: File, private val metadata: PatchMetadata,
         var count = 0
         targets(rule.value("TARGET")).filter { it.isFile }.forEach { file ->
             val input = text(file)
-            val matcher = pattern.matcher(input)
+            // A rule may describe the exact method in NAME but use a short
+            // context such as ".registers 3" in MATCH.  Restrict that context
+            // to the named method when it actually matches there; otherwise
+            // keep the old file-wide behavior for compatibility with rules
+            // that insert a brand-new method.
+            val namedRange = methodRange(input, rule.name)
+            var source = input
+            var sourceStart = 0
+            if (namedRange != null) {
+                val candidate = input.substring(namedRange.first, namedRange.last + 1)
+                if (pattern.matcher(candidate).find()) {
+                    source = candidate
+                    sourceStart = namedRange.first
+                }
+            }
+            val matcher = pattern.matcher(source)
             val output = StringBuilder()
             var last = 0
             var n = 0
             while (matcher.find()) {
-                output.append(input, last, matcher.start())
+                output.append(source, last, matcher.start())
                 output.append(expand(rule.value("REPLACE"), matcher))
                 last = matcher.end(); n++
             }
             if (n > 0) {
-                output.append(input, last, input.length)
-                val result = output.toString()
+                output.append(source, last, source.length)
+                val result = input.substring(0, sourceStart) + output +
+                    input.substring(sourceStart + source.length)
                 if (result != input) {
                     file.writeText(result)
                     stats.changedPaths += relative(file)
                 }
                 count += n
             }
+            if (n == 0) stats.unmatchedRules += rule.name.ifBlank { "line ${rule.line}" }
         }
         stats.matches += count
         if (count == 0) log("${rule.type}, строка ${rule.line}: совпадений нет")
+    }
+
+    /**
+     * Returns the inclusive range of the method named in a patch rule.
+     * Method names in MATCH_REPLACE rules are fully-qualified signatures,
+     * for example com.updatechecker.UpdateChecker.showDialog(Landroid/app/Activity;)V.
+     */
+    private fun methodRange(input: String, qualifiedName: String): IntRange? {
+        val open = qualifiedName.indexOf('(')
+        if (open <= 0) return null
+        val dot = qualifiedName.lastIndexOf('.', open)
+        if (dot < 0) return null
+        val signature = qualifiedName.substring(dot + 1).trim()
+        if (signature.isEmpty() || !signature.contains(')')) return null
+        val header = Regex(
+            "(?m)^\\s*\\.method\\s+[^\\n]*" + Pattern.quote(signature) + "\\s*$"
+        ).find(input) ?: return null
+        val end = input.indexOf(".end method", header.range.last + 1)
+        if (end < 0) return null
+        return header.range.first..(end + ".end method".length - 1)
     }
 
     private fun assign(rule: PatchRule) {
@@ -125,6 +166,23 @@ class PatchEngine(rootDir: File, private val metadata: PatchMetadata,
     private fun add(rule: PatchRule, zip: ZipFile) {
         val source = expand(rule.value("SOURCE")).trim()
         val target = expand(rule.value("TARGET")).trim()
+        if (rule.flag("EXTRACT") && source == PatchFormat.SELF_PAYLOAD) {
+            val parent = if (target == "/" || target.isBlank()) root else PatchFormat.child(root, target)
+            var total = 0L
+            val entries = zip.entries()
+            while (entries.hasMoreElements()) {
+                val entry = entries.nextElement()
+                if (entry.isDirectory || entry.name == "patch.txt") continue
+                val file = PatchFormat.child(parent, entry.name.trimEnd('/'))
+                val bytes = zip.getInputStream(entry).use {
+                    PatchFormat.readBounded(it, 256L * 1024 * 1024)
+                }
+                total += bytes.size
+                if (total > 512L * 1024 * 1024) throw PatchException("Payload ZIP is too large")
+                write(file, bytes)
+            }
+            return
+        }
         val data = payload(zip, source)
         if (rule.flag("EXTRACT")) {
             val parent = if (target == "/" || target.isBlank()) root else PatchFormat.child(root, target)

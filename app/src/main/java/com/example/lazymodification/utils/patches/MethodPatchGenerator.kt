@@ -10,6 +10,9 @@ import org.jf.dexlib2.Opcodes
 import org.jf.dexlib2.iface.ClassDef
 import org.jf.dexlib2.iface.DexFile as DexFileIface
 import java.io.File
+import java.util.zip.Deflater
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /**
  * Строит патч из двух версий APK.
@@ -24,8 +27,8 @@ import java.io.File
  */
 object MethodPatchGenerator {
 
-    /** Предел текста patch.txt — 4 МБ в [PatchFormat]; оставляем запас на заголовки. */
-    private const val MAX_RULES_TEXT = 3_400_000
+    /** Предел текста patch.txt — 16 МБ в [PatchFormat]; оставляем запас на заголовки. */
+    private const val MAX_RULES_TEXT = 12_000_000
     private const val COMPACT_RULES = true
 
     data class Result(
@@ -103,6 +106,7 @@ object MethodPatchGenerator {
 
         val payloadDir = File(root, "payloads").apply { mkdirs() }
         val payloads = linkedMapOf<String, File>()
+        val wholeFiles = linkedMapOf<String, File>()
         val text = StringBuilder(header(oldInfo, author))
         var methodRules = 0
         var fileRules = 0
@@ -123,7 +127,7 @@ object MethodPatchGenerator {
                     }
                     else -> {
                         val target = base?.path ?: updated.path
-                        fileRules += appendWhole(text, payloads, payloadDir, updated, target)
+                        fileRules += collectWhole(wholeFiles, updated, target)
                     }
                 }
                 return@forEachIndexed
@@ -133,12 +137,12 @@ object MethodPatchGenerator {
                     removedRules += appendRemove(text, base!!.path)
                 }
                 base == null && updated != null -> {
-                    fileRules += appendWhole(text, payloads, payloadDir, updated, updated.path)
+                    fileRules += collectWhole(wholeFiles, updated, updated.path)
                 }
                 base != null && updated != null -> {
                     val diff = diffClass(base.path, base.file, updated.file, type in forceWhole)
                     if (diff.replaceWhole) {
-                        fileRules += appendWhole(text, payloads, payloadDir, updated, base.path)
+                        fileRules += collectWhole(wholeFiles, updated, base.path)
                         return@forEachIndexed
                     }
                     var switched = false
@@ -153,11 +157,31 @@ object MethodPatchGenerator {
                         methodRules++
                     }
                     if (switched) {
-                        fileRules += appendWhole(text, payloads, payloadDir, updated, base.path)
+                        fileRules += collectWhole(wholeFiles, updated, base.path)
                         overBudget = text.length > MAX_RULES_TEXT
                     }
                 }
             }
+        }
+        if (wholeFiles.isNotEmpty()) {
+            // Один tree.zip на все целые smali-файлы: меньше заголовков ZIP
+            // и одна EXTRACT-операция. Внутри архива пути smali/... .
+            val tree = File(payloadDir, "tree.zip")
+            ZipOutputStream(tree.outputStream().buffered()).use { zip ->
+                zip.setLevel(Deflater.BEST_COMPRESSION)
+                wholeFiles.forEach { (target, source) ->
+                    zip.putNextEntry(ZipEntry(target))
+                    source.inputStream().use { it.copyTo(zip) }
+                    zip.closeEntry()
+                }
+            }
+            val treeName = "tree.zip"
+            payloads[treeName] = tree
+            text.append("[ADD_FILES]\n")
+            text.append("TARGET:\n/\n\n")
+            text.append("SOURCE:\n").append(treeName).append("\n\n")
+            text.append("EXTRACT:\ntrue\n\n")
+            text.append("[/ADD_FILES]\n\n")
         }
         if (methodRules + fileRules + removedRules == 0)
             throw PatchException("Изменений в коде не найдено — патч не требуется")
@@ -425,21 +449,12 @@ object MethodPatchGenerator {
         append("[/MATCH_REPLACE]\n\n")
     }
 
-    private fun appendWhole(
-        text: StringBuilder,
-        payloads: MutableMap<String, File>,
-        payloadDir: File,
+    private fun collectWhole(
+        wholeFiles: MutableMap<String, File>,
         source: SmaliRef,
         target: String
     ): Int {
-        val name = "code/$target"
-        val copy = File(payloadDir, name).apply { parentFile?.mkdirs() }
-        source.file.copyTo(copy, overwrite = true)
-        payloads[name] = copy
-        text.append("[ADD_FILES]\n")
-        text.append("TARGET:\n").append(target).append("\n\n")
-        text.append("SOURCE:\n").append(name).append("\n")
-        text.append("[/ADD_FILES]\n\n")
+        wholeFiles[target] = source.file
         return 1
     }
 

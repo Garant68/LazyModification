@@ -243,7 +243,7 @@ class PatchActivity : AppCompatActivity() {
         val patch = files.firstOrNull() ?: return
         patchOfferShown = true
         val names = "• " + patch.name
-        MaterialAlertDialogBuilder(this)
+        val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.patch_found_title)
             .setMessage(getString(R.string.patch_found_message, names))
             .setPositiveButton(R.string.patch_found_apply) { _, _ ->
@@ -252,7 +252,10 @@ class PatchActivity : AppCompatActivity() {
                 if (otherPatchesSelected()) showSigningDialog()
             }
             .setNegativeButton(R.string.patch_found_no, null)
-            .show()
+        if (LmPatchContainer.isLmPatch(patch)) {
+            dialog.setNeutralButton(R.string.lm_patch_view) { _, _ -> showLmPatchText(patch) }
+        }
+        dialog.show()
     }
 
     private fun refreshCustomPatches() {
@@ -292,7 +295,6 @@ class PatchActivity : AppCompatActivity() {
                             )
                         )
                         .setPositiveButton(android.R.string.ok, null)
-                        .setNeutralButton(R.string.lm_patch_view) { _, _ -> showLmPatchText(file) }
                         .show()
                 }
             } catch (t: Throwable) {

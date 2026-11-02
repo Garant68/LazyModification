@@ -727,6 +727,12 @@
 
     <string name="start_translate">Започни превод</string>
 
+    <string name="dictionary_translate_action">Преведи</string>
+
+    <string name="continue_translate">Допреведи</string>
+
+    <string name="nothing_to_continue">Няма липсващи низове за допревод</string>
+
     <string name="status_preparing_strings">Подготовка на низове…</string>
 
     <string name="status_translating">Превод: %1$d от %2$d…</string>
@@ -734,6 +740,12 @@
     <string name="translations_preview">Преглед: %1$d низа</string>
 
     <string name="apply_translations">Приложи превода</string>
+
+    <string name="create_dictionary">Създай речник</string>
+    <string name="status_dictionary_write">Създаване на речник…</string>
+    <string name="dictionary_saved">Речникът е запазен: %1$s</string>
+    <string name="dictionary_empty">Няма преведени низове за речника</string>
+    <string name="err_dictionary_failed">Грешка при създаване на речник: %1$s</string>
 
     <string name="err_translator_key_required">Въведете ключ за избрания преводач</string>
 
@@ -754,6 +766,18 @@
     <string name="fast_strings_hint">Низове за превод, разделени със запетая</string>
 
     <string name="fast_strings_note">Със запетая. Преводач: MyMemory.</string>
+
+    <string name="use_dictionary">Речник</string>
+
+    <string name="choose_dictionary">Избери речник</string>
+
+    <string name="dictionary_not_selected">Не е избран файл с речник</string>
+
+    <string name="dictionary_loaded">Речник: %1$d двойки</string>
+
+    <string name="err_dictionary_required">Избери файл с речник или премахни отметката „Речник“</string>
+
+    <string name="err_dictionary_load">Речникът не може да бъде прочетен: %1$s</string>
 
     <string name="fast_translate_action">Преведи</string>
 

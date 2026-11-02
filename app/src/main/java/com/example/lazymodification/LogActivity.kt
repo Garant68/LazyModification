@@ -9,6 +9,8 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.view.View
 import android.view.WindowManager
@@ -48,6 +50,14 @@ class LogActivity : AppCompatActivity() {
 
     private val logBuffer = StringBuilder()
     private val plainLogBuffer = StringBuilder()
+    private val uiHandler = Handler(Looper.getMainLooper())
+    private var logUiPending = false
+    private val flushLogUi = Runnable {
+        logUiPending = false
+        if (isFinishing || isDestroyed) return@Runnable
+        tvLog.text = android.text.Html.fromHtml(logBuffer.toString(), android.text.Html.FROM_HTML_MODE_LEGACY)
+        if (autoFollowLog) scrollView.fullScroll(ScrollView.FOCUS_DOWN)
+    }
 
     private var sourceApkPath: String? = null
     private var hasError = false
@@ -130,9 +140,9 @@ class LogActivity : AppCompatActivity() {
                 }
             }
 
-            runOnUiThread {
-                tvLog.text = android.text.Html.fromHtml(logBuffer.toString(), android.text.Html.FROM_HTML_MODE_LEGACY)
-                if (autoFollowLog) scrollView.fullScroll(ScrollView.FOCUS_DOWN)
+            if (!logUiPending) {
+                logUiPending = true
+                uiHandler.postDelayed(flushLogUi, 120L)
             }
         }
     }
@@ -307,6 +317,7 @@ class LogActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        uiHandler.removeCallbacks(flushLogUi)
         val lbm = LocalBroadcastManager.getInstance(this)
         lbm.unregisterReceiver(logReceiver)
         lbm.unregisterReceiver(progressReceiver)

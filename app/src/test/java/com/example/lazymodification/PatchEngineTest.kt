@@ -46,6 +46,48 @@ class PatchEngineTest {
         assertEquals("#invoke a\$Inner;\\n\n\n", first.readText())
         assertEquals(first.readText(), second.readText())
     }
+
+    @Test fun registerContextUsesTheMethodNamedInTheRule() = work { dir ->
+        val root = File(dir, "project").apply { mkdirs() }
+        val file = put(root, "smali/test/UpdateChecker.smali", """
+            .class public Lcom/updatechecker/UpdateChecker;
+            .super Ljava/lang/Object;
+
+            .method static helper(Landroid/content/Context;F)F
+                .registers 3
+                const/high16 v0, 0x3f800000
+                return v0
+            .end method
+
+            .method public static showDialog(Landroid/app/Activity;)V
+                .registers 3
+                invoke-static {p0}, Lcom/updatechecker/UpdateChecker;->helper(Landroid/content/Context;F)F
+                return-void
+            .end method
+        """.trimIndent())
+        val patch = zip(dir, """
+            [MATCH_REPLACE]
+            NAME:
+            com.updatechecker.UpdateChecker.showDialog(Landroid/app/Activity;)V
+            TARGET:
+            smali/test/UpdateChecker.smali
+            REGEX:
+            true
+            DOTALL:
+            true
+            MATCH:
+            (?s)(\Q    .registers 3
+            \E)
+            REPLACE:
+            ${'$'}{GROUP1}
+                return-void
+            [/MATCH_REPLACE]
+        """)
+        apply(root, patch)
+        val text = file.readText()
+        assertEquals(2, Regex("return-void").findAll(text).count())
+        assertTrue(text.indexOf("return-void") > text.indexOf(".method public static showDialog"))
+    }
     @Test fun assignmentConditionalJumpAndPayloadRoundtrip() = work { dir ->
         val root = File(dir, "project").apply { mkdirs() }
         put(root, "assets/in.txt", "hello42")

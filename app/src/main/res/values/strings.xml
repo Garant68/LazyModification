@@ -739,6 +739,12 @@
 
     <string name="start_translate">Начать перевод</string>
 
+    <string name="dictionary_translate_action">Перевести</string>
+
+    <string name="continue_translate">Доперевести</string>
+
+    <string name="nothing_to_continue">Нет строк, которые нужно доперевести</string>
+
     <string name="status_preparing_strings">Подготовка строк…</string>
 
     <string name="status_translating">Перевод: %1$d из %2$d…</string>
@@ -746,6 +752,12 @@
     <string name="translations_preview">Предпросмотр: %1$d строк</string>
 
     <string name="apply_translations">Применить перевод</string>
+
+    <string name="create_dictionary">Создать Словарь</string>
+    <string name="status_dictionary_write">Создание словаря…</string>
+    <string name="dictionary_saved">Словарь сохранён: %1$s</string>
+    <string name="dictionary_empty">Нет переведённых строк для словаря</string>
+    <string name="err_dictionary_failed">Ошибка создания словаря: %1$s</string>
 
     <string name="err_translator_key_required">Введите ключ выбранного переводчика</string>
 
@@ -766,6 +778,18 @@
     <string name="fast_strings_hint">Строки для перевода, через запятую</string>
 
     <string name="fast_strings_note">Строки через запятую. Переводчик: MyMemory.</string>
+
+    <string name="use_dictionary">Словарь</string>
+
+    <string name="choose_dictionary">Выбрать словарь</string>
+
+    <string name="dictionary_not_selected">Файл словаря не выбран</string>
+
+    <string name="dictionary_loaded">Словарь: %1$d пар</string>
+
+    <string name="err_dictionary_required">Выберите файл словаря или снимите галочку «Словарь»</string>
+
+    <string name="err_dictionary_load">Не удалось прочитать словарь: %1$s</string>
 
     <string name="fast_translate_action">Перевести</string>
 

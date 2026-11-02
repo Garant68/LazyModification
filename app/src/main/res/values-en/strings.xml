@@ -743,6 +743,12 @@
 
     <string name="start_translate">Start translation</string>
 
+    <string name="dictionary_translate_action">Translate</string>
+
+    <string name="continue_translate">Continue translation</string>
+
+    <string name="nothing_to_continue">There are no missing strings to continue translating</string>
+
     <string name="status_preparing_strings">Preparing strings…</string>
 
     <string name="status_translating">Translating: %1$d of %2$d…</string>
@@ -750,6 +756,12 @@
     <string name="translations_preview">Preview: %1$d strings</string>
 
     <string name="apply_translations">Apply translation</string>
+
+    <string name="create_dictionary">Create Dictionary</string>
+    <string name="status_dictionary_write">Creating dictionary…</string>
+    <string name="dictionary_saved">Dictionary saved: %1$s</string>
+    <string name="dictionary_empty">No translated strings for the dictionary</string>
+    <string name="err_dictionary_failed">Dictionary creation error: %1$s</string>
 
     <string name="err_translator_key_required">Enter the key for the selected translator</string>
 
@@ -770,6 +782,18 @@
     <string name="fast_strings_hint">Strings to translate, comma-separated</string>
 
     <string name="fast_strings_note">Comma-separated. Translator: MyMemory.</string>
+
+    <string name="use_dictionary">Dictionary</string>
+
+    <string name="choose_dictionary">Choose dictionary</string>
+
+    <string name="dictionary_not_selected">No dictionary file selected</string>
+
+    <string name="dictionary_loaded">Dictionary: %1$d pairs</string>
+
+    <string name="err_dictionary_required">Choose a dictionary file or clear the “Dictionary” checkbox</string>
+
+    <string name="err_dictionary_load">Could not read the dictionary: %1$s</string>
 
     <string name="fast_translate_action">Translate</string>
 

@@ -60,6 +60,9 @@ class ApkPatchRunnerTest {
                 mapOf("classes.dex" to dex.readBytes(),"classes2.dex" to dex2.readBytes(),
                     "assets/untouched.bin" to ByteArray(131) { it.toByte() },
                     "lib/arm64-v8a/libfixture.so" to ByteArray(211) { (it*3).toByte() },
+                    "kotlin/kotlin.kotlin_builtins" to ByteArray(32) { 7 },
+                    "DebugProbesKt.bin" to ByteArray(16) { 8 },
+                    "junk-root.txt" to "remove me".toByteArray(),
                     "META-INF/OLD.SF" to "old signature".toByteArray(),
                     "META-INF/services/keep" to "keep service".toByteArray()).forEach { (name, bytes) ->
                     zip.putNextEntry(ZipEntry(name));zip.write(bytes);zip.closeEntry()
@@ -75,6 +78,11 @@ class ApkPatchRunnerTest {
         val first=File(dir,"premium.apk")
         val result=ApkPatchRunner.apply(null,input,premium,first,File(dir,"premium-work"))
         assertTrue(result.matches>0)
+        ZipFile(first).use {
+            assertNull(it.getEntry("kotlin/kotlin.kotlin_builtins"))
+            assertNull(it.getEntry("DebugProbesKt.bin"))
+            assertNull(it.getEntry("junk-root.txt"))
+        }
         val dex2=File(dir,"read.dex").apply { writeBytes(entry(first,"classes2.dex")) }
         val caller=DexFileFactory.loadDexFile(dex2,null).classes.single().methods.first { it.name=="test" }
         val calls=caller.implementation!!.instructions.filterIsInstance<ReferenceInstruction>().mapNotNull { it.reference as? MethodReference }
@@ -114,5 +122,34 @@ class ApkPatchRunnerTest {
         assertArrayEquals(entry(input,"classes2.dex"),entry(output,"classes2.dex"))
         assertArrayEquals(entry(input,"assets/untouched.bin"),entry(output,"assets/untouched.bin"))
         assertFalse(entry(input,"resources.arsc").contentEquals(entry(output,"resources.arsc")))
+    }
+
+    @Test fun extractedAddFilesTreeAddsNestedFiles() = work { dir ->
+        val input = fixture(dir)
+        val tree = File(dir, "tree-payload.zip")
+        ZipOutputStream(tree.outputStream()).use { zip ->
+            zip.putNextEntry(ZipEntry("assets/nested/tree-added.txt"))
+            zip.write("tree payload".toByteArray())
+            zip.closeEntry()
+        }
+        val patchText = "[ADD_FILES]\nTARGET:\n/\n\nSOURCE:\ntree.zip\n\nEXTRACT:\ntrue\n\n[/ADD_FILES]"
+        val patch = File(dir, "tree-patch.zip")
+        PatchFormat.writeZip(patch, patchText, mapOf("tree.zip" to tree))
+        val output = File(dir, "tree.apk")
+        val result = ApkPatchRunner.apply(null, input, patch, output, File(dir, "tree-work"))
+        assertTrue(result.changed)
+        assertArrayEquals("tree payload".toByteArray(), entry(output, "assets/nested/tree-added.txt"))
+    }
+
+    @Test fun selfPayloadAddFilesAddsNestedFilesWithoutTreeZip() = work { dir ->
+        val input = fixture(dir)
+        val payload = File(dir, "self-payload.bin").apply { writeText("direct payload") }
+        val patchText = "[ADD_FILES]\nTARGET:\n/\n\nSOURCE:\n.\n\nEXTRACT:\ntrue\n\n[/ADD_FILES]"
+        val patch = File(dir, "self-patch.zip")
+        PatchFormat.writeZip(patch, patchText, mapOf("assets/nested/self-added.txt" to payload))
+        val output = File(dir, "self.apk")
+        val result = ApkPatchRunner.apply(null, input, patch, output, File(dir, "self-work"))
+        assertTrue(result.changed)
+        assertArrayEquals("direct payload".toByteArray(), entry(output, "assets/nested/self-added.txt"))
     }
 }
