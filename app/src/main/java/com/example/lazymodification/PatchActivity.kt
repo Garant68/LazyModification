@@ -6,7 +6,11 @@ import android.app.ProgressDialog
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.graphics.Color
 import android.graphics.Typeface
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import android.util.Log
 import android.view.Gravity
 import android.view.View
@@ -1032,8 +1036,26 @@ class PatchActivity : AppCompatActivity() {
         .removePrefix("sha256:").replace(Regex("\\s+"), "")
 
     private fun showInspectorReport(report: String) {
+        val spannable = SpannableString(report)
+        var lineStart = 0
+        for (line in report.split('\n')) {
+            val lower = line.lowercase(Locale.US)
+            val warning = lower.contains("flutter") ||
+                lower.contains("флуттер") ||
+                line.contains("🚨") ||
+                line.contains("⚠")
+            if (warning && line.isNotEmpty()) {
+                spannable.setSpan(
+                    ForegroundColorSpan(Color.RED),
+                    lineStart,
+                    lineStart + line.length,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+            }
+            lineStart += line.length + 1
+        }
         val tv = TextView(this).apply {
-            text = report
+            text = spannable
             textSize = 14f
             setTextIsSelectable(true)
             setPadding(48, 24, 48, 24)

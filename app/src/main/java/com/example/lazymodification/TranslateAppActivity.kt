@@ -11,6 +11,8 @@ import android.provider.Settings
 import android.util.Log
 import android.view.View
 import android.view.WindowManager
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -18,6 +20,7 @@ import android.widget.ProgressBar
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.ScrollView
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -35,10 +38,11 @@ import com.google.android.material.button.MaterialButton
 import com.reandroid.apk.ApkModule
 import com.reandroid.arsc.value.ResConfig
 import java.io.File
+import java.util.Locale
 
 /**
  * «Перевести приложение»: перевод строк приложения выбранным онлайн-переводчиком
- * с предпросмотром, кэшем и созданием русской локали в resources.arsc.
+ * с предпросмотром, кэшем и созданием выбранной локали в resources.arsc.
  *
  * Плейсхолдеры (%1$s и т.п.) защищаются от перевода (AppTranslator).
  * Перевод применяется только по кнопке «Применить переводы».
@@ -48,13 +52,23 @@ class TranslateAppActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_APK_PATH = "com.example.lazymodification.INTERFACE_APK_PATH"
         private const val TAG = "TranslateApp"
-        private const val TARGET_LANG = "ru"
+        private const val DEFAULT_TARGET_LANG = "ru"
+        private const val PREFS_NAME = "translate_app"
+        private const val PREF_TARGET_LANG = "target_language"
     }
 
     private var apkPath: String? = null
     private var isProcessing = false
+    private var targetLanguage = DEFAULT_TARGET_LANG
+
+    private val targetLanguages = listOf(
+        "ru", "en", "bg", "uk", "de", "fr", "es", "it", "pt",
+        "nl", "pl", "cs", "sk", "ro", "hu", "el", "tr", "sr", "hr",
+        "ar", "hi", "zh", "ja", "ko", "vi", "th", "id", "he"
+    )
 
     private lateinit var tvFileName: TextView
+    private lateinit var spTargetLanguage: Spinner
     private lateinit var rgMode: RadioGroup
     private lateinit var rbModeFull: RadioButton
     private lateinit var rbModeFast: RadioButton
@@ -108,7 +122,13 @@ class TranslateAppActivity : AppCompatActivity() {
         }
     }
 
-    private data class Row(val resourceId: Int, val name: String, val original: String, var translated: String)
+    private data class Row(
+        val resourceId: Int,
+        val name: String,
+        val original: String,
+        var translated: String,
+        var excluded: Boolean = false
+    )
 
     private val rows = mutableListOf<Row>()
 
@@ -142,12 +162,55 @@ class TranslateAppActivity : AppCompatActivity() {
         if (uri != null) loadDictionary(uri)
     }
 
+    private val translationEditorLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode != RESULT_OK) return@registerForActivityResult
+        val data = result.data ?: return@registerForActivityResult
+        val ids = data.getIntArrayExtra(TranslationEditorActivity.EXTRA_IDS)
+            ?: return@registerForActivityResult
+        val names = data.getStringArrayListExtra(TranslationEditorActivity.EXTRA_NAMES)
+            ?: return@registerForActivityResult
+        val originals = data.getStringArrayListExtra(TranslationEditorActivity.EXTRA_ORIGINALS)
+            ?: return@registerForActivityResult
+        val translations = data.getStringArrayListExtra(TranslationEditorActivity.EXTRA_TRANSLATIONS)
+            ?: return@registerForActivityResult
+        val excluded = data.getBooleanArrayExtra(TranslationEditorActivity.EXTRA_EXCLUDED)
+        if (ids.size != names.size || names.size != originals.size ||
+            originals.size != translations.size
+        ) return@registerForActivityResult
+        rows.clear()
+        for (i in ids.indices) {
+            rows.add(
+                Row(
+                    ids[i],
+                    names[i],
+                    originals[i],
+                    translations[i],
+                    excluded?.getOrNull(i) == true
+                )
+            )
+        }
+        val action = data.getStringExtra(TranslationEditorActivity.EXTRA_ACTION)
+        if (action == TranslationEditorActivity.ACTION_APPLY) {
+            llSetup.visibility = View.GONE
+            llPreview.removeAllViews()
+            tvPreviewTitle.visibility = View.GONE
+            applyTranslations()
+        } else {
+            // The old preview form is intentionally not shown anymore: Back
+            // from the two-column editor returns to the previous screen.
+            finish()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ThemeHelper.apply(this)
         setContentView(R.layout.activity_translate_app)
 
         tvFileName = findViewById(R.id.tvFileName)
+        spTargetLanguage = findViewById(R.id.spTargetLanguage)
         rgMode = findViewById(R.id.rgMode)
         rbModeFull = findViewById(R.id.rbModeFull)
         rbModeFast = findViewById(R.id.rbModeFast)
@@ -196,6 +259,7 @@ class TranslateAppActivity : AppCompatActivity() {
             return
         }
         tvFileName.text = getString(R.string.file_label, file.name)
+        setupTargetLanguage()
 
         rgTranslator.setOnCheckedChangeListener { _, _ -> updateProviderFields() }
         rgMode.setOnCheckedChangeListener { _, _ -> updateModeUI() }
@@ -208,10 +272,53 @@ class TranslateAppActivity : AppCompatActivity() {
         }
         updateModeUI()
 
-        btnStart.setOnClickListener { startTranslation() }
+        btnStart.setOnClickListener {
+            openTranslationEditor()
+        }
         btnApply.setOnClickListener { applyTranslations() }
         btnCreateDictionary.setOnClickListener { createDictionary() }
         btnContinueTranslate.setOnClickListener { continueTranslation() }
+    }
+
+    private fun setupTargetLanguage() {
+        val labels = targetLanguages.map { targetLanguageName(it) }
+        val adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_item,
+            labels
+        ).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+        spTargetLanguage.adapter = adapter
+
+        val saved = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .getString(PREF_TARGET_LANG, DEFAULT_TARGET_LANG)
+        val index = targetLanguages.indexOf(saved).takeIf { it >= 0 } ?: 0
+        targetLanguage = targetLanguages[index]
+        spTargetLanguage.setSelection(index, false)
+        spTargetLanguage.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(
+                parent: AdapterView<*>?,
+                view: View?,
+                position: Int,
+                id: Long
+            ) {
+                val code = targetLanguages.getOrNull(position) ?: return
+                targetLanguage = code
+                getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                    .edit()
+                    .putString(PREF_TARGET_LANG, code)
+                    .apply()
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        }
+    }
+
+    private fun targetLanguageName(code: String): String {
+        val display = Locale.forLanguageTag(code).getDisplayLanguage(Locale.getDefault())
+        if (display.isBlank()) return code.uppercase(Locale.US)
+        return display.replaceFirstChar { it.titlecase(Locale.getDefault()) }
     }
 
     override fun onDestroy() {
@@ -236,7 +343,6 @@ class TranslateAppActivity : AppCompatActivity() {
     /** Быстрый режим: перевод вручную введённых строк через DeepL Free. */
     private fun updateModeUI() {
         val fast = rbModeFast.isChecked
-        val dictionaryReady = cbDictionary.isChecked && dictionaryEntries != null
         tvTranslatorLabel.visibility = if (fast) View.GONE else View.VISIBLE
         rgTranslator.visibility = if (fast) View.GONE else View.VISIBLE
         llFastInput.visibility = if (fast) View.VISIBLE else View.GONE
@@ -247,14 +353,8 @@ class TranslateAppActivity : AppCompatActivity() {
             updateProviderFields()
         }
         // Кнопка перевода по словарю появляется только после выбора файла.
-        btnStart.visibility = if (cbDictionary.isChecked && !dictionaryReady) View.GONE else View.VISIBLE
-        btnStart.text = getString(
-            when {
-                dictionaryReady -> R.string.dictionary_translate_action
-                fast -> R.string.fast_translate_action
-                else -> R.string.start_translate
-            }
-        )
+        btnStart.visibility = View.VISIBLE
+        btnStart.text = getString(R.string.start_translate)
     }
 
     private fun loadDictionary(uri: Uri) {
@@ -292,6 +392,42 @@ class TranslateAppActivity : AppCompatActivity() {
         return true
     }
 
+    private fun openTranslationEditor() {
+        if (isProcessing) return
+        val useDictionary = cbDictionary.isChecked
+        if (useDictionary && dictionaryEntries == null) {
+            Toast.makeText(this, getString(R.string.err_dictionary_required), Toast.LENGTH_LONG).show()
+            return
+        }
+        val provider = currentProvider()
+        val key = when (provider) {
+            AppTranslator.AZURE -> etAzureKey.text.toString().trim()
+            AppTranslator.DEEPL -> etDeeplKey.text.toString().trim()
+            else -> null
+        }
+        if ((provider == AppTranslator.AZURE || provider == AppTranslator.DEEPL) &&
+            key.isNullOrEmpty()
+        ) {
+            Toast.makeText(this, getString(R.string.err_translator_key_required), Toast.LENGTH_LONG).show()
+            return
+        }
+        val dictionary = ArrayList<String>()
+        dictionaryEntries?.forEach { (from, to) ->
+            dictionary.add(from)
+            dictionary.add(to)
+        }
+        val intent = Intent(this, TranslationEditorActivity::class.java).apply {
+            putExtra(TranslationEditorActivity.EXTRA_APK_PATH, apkPath)
+            putExtra(TranslationEditorActivity.EXTRA_TARGET_LANGUAGE, targetLanguage)
+            putExtra(TranslationEditorActivity.EXTRA_PROVIDER, provider)
+            putExtra(TranslationEditorActivity.EXTRA_AZURE_KEY, etAzureKey.text.toString().trim())
+            putExtra(TranslationEditorActivity.EXTRA_AZURE_REGION, etAzureRegion.text.toString().trim())
+            putExtra(TranslationEditorActivity.EXTRA_DEEPL_KEY, etDeeplKey.text.toString().trim())
+            putStringArrayListExtra(TranslationEditorActivity.EXTRA_DICTIONARY, dictionary)
+        }
+        translationEditorLauncher.launch(intent)
+    }
+
     private fun startTranslation() {
         if (isProcessing) return
         if (rbModeFast.isChecked) {
@@ -327,11 +463,12 @@ class TranslateAppActivity : AppCompatActivity() {
         llPreview.removeAllViews()
         llProgress.visibility = View.VISIBLE
         tvStatus.text = getString(R.string.status_preparing_strings)
+        val target = targetLanguage
 
         Thread {
             try {
                 val collected = mutableListOf<Row>()
-                val ruConfig = ResConfig.parse(TARGET_LANG)
+                val targetConfig = ResConfig.parse(target)
                 val module = ApkModule.loadApkFile(File(apkPath!!))
                 try {
                     for (pkg in module.tableBlock.listPackages()) {
@@ -342,7 +479,7 @@ class TranslateAppActivity : AppCompatActivity() {
                             if (def.isNull()) continue
                             val v = def.getValueAsString() ?: continue
                             if (!shouldTranslate(v)) continue
-                            val existing = e.get(ruConfig)?.takeIf { !it.isNull() }?.getValueAsString()
+                            val existing = e.get(targetConfig)?.takeIf { !it.isNull() }?.getValueAsString()
                             val initial = if (useDictionary) {
                                 dictionary?.get(v)?.takeIf { it.isNotBlank() && it != v }
                                     ?: existing?.takeIf { it.isNotBlank() && it != v }
@@ -361,13 +498,13 @@ class TranslateAppActivity : AppCompatActivity() {
                     var i = 0
                     for (r in collected) {
                         i++
-                        val ck = cache.key(provider, "auto", TARGET_LANG, r.original)
+                        val ck = cache.key(provider, "auto", target, r.original)
                         val cached = cache.get(ck)
                         if (cached != null) {
                             r.translated = cached
                         } else {
                             try {
-                                r.translated = AppTranslator.translateOnce(provider, key, region, "auto", TARGET_LANG, r.original)
+                                r.translated = AppTranslator.translateOnce(provider, key, region, "auto", target, r.original)
                                 cache.put(ck, r.translated)
                             } catch (ex: Exception) {
                                 Log.w(TAG, "skip \"${r.original.take(40)}\": ${ex.message}")
@@ -424,6 +561,7 @@ class TranslateAppActivity : AppCompatActivity() {
         llProgress.visibility = View.VISIBLE
         tvStatus.text = getString(R.string.status_preparing_strings)
         scrollMain.scrollTo(0, 0)
+        val target = targetLanguage
 
         Thread {
             try {
@@ -441,7 +579,7 @@ class TranslateAppActivity : AppCompatActivity() {
                         // оставшиеся строки пользователь отправит кнопкой «Доперевести».
                         translated = item
                     } else {
-                        val ck = cache.key(AppTranslator.MYMEMORY, "auto", TARGET_LANG, item)
+                        val ck = cache.key(AppTranslator.MYMEMORY, "auto", target, item)
                         val cached = cache.get(ck)
                         if (cached != null) {
                             translated = cached
@@ -449,7 +587,7 @@ class TranslateAppActivity : AppCompatActivity() {
                             var t = item
                             var ok = false
                             try {
-                                t = AppTranslator.translateOnce(AppTranslator.MYMEMORY, null, null, "auto", TARGET_LANG, item)
+                                t = AppTranslator.translateOnce(AppTranslator.MYMEMORY, null, null, "auto", target, item)
                                 ok = true
                             } catch (ex: Exception) {
                                 Log.w(TAG, "skip \"${item.take(40)}\": ${ex.message}")
@@ -582,20 +720,21 @@ class TranslateAppActivity : AppCompatActivity() {
         btnCreateDictionary.isEnabled = false
         btnStart.isEnabled = false
         showProgressDialog(getString(R.string.status_translating, 0, missing.size))
+        val target = targetLanguage
 
         Thread {
             try {
                 var i = 0
                 for (row in missing) {
                     i++
-                    val ck = cache.key(provider, "auto", TARGET_LANG, row.original)
+                    val ck = cache.key(provider, "auto", target, row.original)
                     val cached = cache.get(ck)
                     if (cached != null) {
                         row.translated = cached
                     } else {
                         try {
                             row.translated = AppTranslator.translateOnce(
-                                provider, key, region, "auto", TARGET_LANG, row.original
+                                provider, key, region, "auto", target, row.original
                             )
                             cache.put(ck, row.translated)
                         } catch (ex: Exception) {
@@ -695,6 +834,8 @@ class TranslateAppActivity : AppCompatActivity() {
 
     private fun applyTranslations() {
         if (isProcessing || rows.isEmpty()) return
+        val target = targetLanguage
+        val targetName = targetLanguageName(target)
         keepScreenOn(true)
         isProcessing = true
         btnApply.isEnabled = false
@@ -702,9 +843,9 @@ class TranslateAppActivity : AppCompatActivity() {
         btnContinueTranslate.isEnabled = false
         llProgress.visibility = View.VISIBLE
         progressBar.visibility = View.VISIBLE
-        tvStatus.text = getString(R.string.status_translations_write)
+        tvStatus.text = getString(R.string.status_translations_write, targetName)
         scrollMain.scrollTo(0, 0)
-        showProgressDialog(getString(R.string.status_translations_write))
+        showProgressDialog(getString(R.string.status_translations_write, targetName))
 
         Thread {
             var notFound: List<String> = emptyList()
@@ -712,10 +853,17 @@ class TranslateAppActivity : AppCompatActivity() {
                 val work = File(cacheDir, "translate_${System.currentTimeMillis()}.apk")
                 val module = ApkModule.loadApkFile(File(apkPath!!))
                 try {
-                    val byId = rows.filter { it.resourceId != 0 }.associateBy { it.resourceId }
-                    val byValue = rows.filter { it.resourceId == 0 }.associate { it.original to it.translated }
+                    // Rows without a translation must not blank out the
+                    // original string. The editor can create a dictionary
+                    // from a partially filled list as well.
+                    val byId = rows
+                        .filter { it.resourceId != 0 && it.translated.isNotBlank() }
+                        .associateBy { it.resourceId }
+                    val byValue = rows
+                        .filter { it.resourceId == 0 && it.translated.isNotBlank() }
+                        .associateBy { it.original }
                     val matchedValues = mutableSetOf<String>()
-                    val ru = ResConfig.parse(TARGET_LANG)
+                    val targetConfig = ResConfig.parse(target)
                     for (pkg in module.tableBlock.listPackages()) {
                         val strings = pkg.getResources("string")
                         while (strings.hasNext()) {
@@ -723,7 +871,9 @@ class TranslateAppActivity : AppCompatActivity() {
                             if (byId.isNotEmpty()) {
                                 val row = byId[e.getResourceId()]
                                 if (row != null) {
-                                    if (row.translated != row.original) e.getOrCreate(ru).setValueAsString(row.translated)
+                                    if (row.excluded || row.translated != row.original) {
+                                        e.getOrCreate(targetConfig).setValueAsString(row.translated)
+                                    }
                                     continue
                                 }
                             }
@@ -731,9 +881,11 @@ class TranslateAppActivity : AppCompatActivity() {
                                 val def = e.get(ResConfig.getDefault()) ?: e.get() ?: continue
                                 if (def.isNull()) continue
                                 val v = def.getValueAsString() ?: continue
-                                val t = byValue[v] ?: continue
+                                val row = byValue[v] ?: continue
                                 matchedValues.add(v)
-                                if (t != v) e.getOrCreate(ru).setValueAsString(t)
+                                if (row.excluded || row.translated != row.original) {
+                                    e.getOrCreate(targetConfig).setValueAsString(row.translated)
+                                }
                             }
                         }
                     }
@@ -780,7 +932,11 @@ class TranslateAppActivity : AppCompatActivity() {
                     btnApply.isEnabled = true
                     btnCreateDictionary.isEnabled = true
                     btnContinueTranslate.isEnabled = true
-                    Toast.makeText(this, getString(R.string.translations_applied), Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        this,
+                        getString(R.string.translations_applied, targetName),
+                        Toast.LENGTH_LONG
+                    ).show()
                     if (notFound.isEmpty()) {
                         showInstallDialog()
                     } else {

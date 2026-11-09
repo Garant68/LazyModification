@@ -3,7 +3,11 @@ package com.example.lazymodification.utils
 import android.content.Context
 import com.example.lazymodification.R
 import com.reandroid.apk.ApkModule
+import com.reandroid.arsc.value.ResConfig
+import org.jf.dexlib2.Opcodes
+import org.jf.dexlib2.dexbacked.DexBackedDexFile
 import java.io.File
+import java.util.Locale
 import java.util.zip.ZipFile
 
 /**
@@ -11,6 +15,12 @@ import java.util.zip.ZipFile
  * Показывает, «за что взяться»: тип приложения, реклама/аналитика, языки, размер, находки.
  */
 object ApkInspector {
+
+    private data class StringCounts(
+        val total: Int,
+        val russian: Int,
+        val defaultIsRussian: Boolean
+    )
 
     private val ADS = listOf(
         "applovin" to "AppLovin",
@@ -50,6 +60,83 @@ object ApkInspector {
         "facebook/appevents" to "Facebook Analytics",
         "bugsnag" to "Bugsnag",
         "newrelic" to "New Relic"
+    )
+
+    private val MODULES_ZIP = listOf(
+        "libhermes" to "Hermes",
+        "libreactnativejni" to "React Native",
+        "libjsc" to "React Native (JSC)",
+        "assets/index.android.bundle" to "React Native",
+        "libunity" to "Unity",
+        "libil2cpp" to "Unity IL2CPP",
+        "libgodot" to "Godot",
+        "libue4" to "Unreal Engine",
+        "libunreal" to "Unreal Engine",
+        "libmonodroid" to "Xamarin/.NET",
+        "libmonosgen" to "Xamarin/.NET",
+        "libnativescript" to "NativeScript",
+        "libcocos" to "Cocos2d",
+        "libdmengine" to "Defold",
+        "libcorona" to "Solar2D",
+        "libairapp" to "Adobe AIR",
+        "capacitor.config" to "Capacitor",
+        "assets/capacitor" to "Capacitor",
+        "assets/expo" to "Expo"
+    )
+
+    private val MODULES_DEX = listOf(
+        "com/facebook/hermes" to "Hermes",
+        "com/facebook/react" to "React Native",
+        "host/exp/exponent" to "Expo",
+        "expo/modules" to "Expo",
+        "com/unity3d/player" to "Unity",
+        "mono/android" to "Xamarin/.NET",
+        "com/getcapacitor" to "Capacitor",
+        "org/apache/cordova" to "Cordova"
+    )
+
+    private val PROTECTIONS_ZIP = listOf(
+        "libjiagu" to "360 Jiagu",
+        "libsecexe" to "Bangcle",
+        "libshella" to "Bangcle/Tencent",
+        "libmobisec" to "Alibaba Security",
+        "libdexprotector" to "DexProtector",
+        "libnagain" to "Nagain",
+        "libpromon" to "Promon SHIELD",
+        "libappsealing" to "AppSealing",
+        "libliapp" to "LIAPP",
+        "libarxan" to "Arxan",
+        "libvbox" to "Virbox",
+        "libsgmain" to "Alibaba Security",
+        "libsgsecuritybody" to "Alibaba Security",
+        "libdexhelper" to "DexHelper",
+        "libprotectclass" to "DexProtector",
+        "libpairip" to "Play Integrity"
+    )
+
+    private val PROTECTIONS_DEX = listOf(
+        "com/guardsquare/dexguard" to "DexGuard",
+        "dexguard" to "DexGuard",
+        "com/dexprotector" to "DexProtector",
+        "com/secneo/apkwrapper" to "Bangcle",
+        "com/qihoo" to "360 Jiagu",
+        "com/tencent/stubshell" to "Tencent Legu",
+        "com/tencent/legu" to "Tencent Legu",
+        "com/google/android/play/core/integrity" to "Play Integrity",
+        "com/google/android/gms/safetynet" to "SafetyNet",
+        "safetynet" to "SafetyNet",
+        "com/scottyab/rootbeer" to "RootBeer",
+        "de/robv/android/xposed" to "Xposed",
+        "frida" to "Frida",
+        "substrate" to "Substrate",
+        "tracerpid" to "Anti-debug (TracerPid)",
+        "ptrace" to "Anti-debug (ptrace)",
+        "magisk" to "Root detection (Magisk)",
+        "superuser" to "Root detection",
+        "certificatepinner" to "Certificate pinning",
+        "x509trustmanager" to "Custom TrustManager",
+        "goldfish" to "Emulator detection",
+        "ranchu" to "Emulator detection"
     )
 
     private val FIND_NEEDLES = listOf(
@@ -96,15 +183,21 @@ object ApkInspector {
         var kind = ""
         var hasFlutter = false
         var hasCompose = false
+        var hasMenuXml = false
+        var hasMenuDex = false
         var hasGPlayUpdate = false
         var hasRuStoreUpdate = false
         val adsFound = LinkedHashSet<String>()
         val analyticsFound = LinkedHashSet<String>()
+        val modulesFound = LinkedHashSet<String>()
+        val protectionsFound = LinkedHashSet<String>()
         var dexBytes = 0L
         var resBytes = 0L
         var assetsBytes = 0L
         var libBytes = 0L
         var otherBytes = 0L
+        var arscSize = 0L
+        var stringCounts: StringCounts? = null
 
         try {
             ZipFile(apk).use { zip ->
@@ -112,24 +205,68 @@ object ApkInspector {
                 while (entries.hasMoreElements()) {
                     val e = entries.nextElement()
                     val n = e.name
+                    val lowerName = n.lowercase(Locale.US)
+                    if (lowerName.startsWith("res/menu/") && lowerName.endsWith(".xml")) {
+                        hasMenuXml = true
+                    }
+                    for ((marker, name) in MODULES_ZIP) {
+                        if (lowerName.contains(marker)) modulesFound.add(name)
+                    }
+                    for ((marker, name) in PROTECTIONS_ZIP) {
+                        if (lowerName.contains(marker)) protectionsFound.add(name)
+                    }
                     when {
                         n.endsWith(".dex") -> {
                             dexBytes += e.size
                             if (e.size in 1..40_000_000L) {
                                 val bytes = readAll(zip, e.name)
-                                if (!hasCompose && containsBytes(bytes, "androidx/compose/")) hasCompose = true
-                                if (!hasGPlayUpdate && containsBytes(bytes, "com/google/android/play/core/appupdate")) hasGPlayUpdate = true
-                                if (!hasRuStoreUpdate && containsBytes(bytes, "ru/rustore/sdk/appupdate")) hasRuStoreUpdate = true
-                                for ((marker, name) in ADS) if (containsBytes(bytes, marker)) adsFound.add(name)
-                                for ((marker, name) in ANALYTICS) if (containsBytes(bytes, marker)) analyticsFound.add(name)
+                                scanDexTypes(bytes) { type ->
+                                    val lower = type.lowercase(Locale.US)
+                                    if (!hasFlutter && lower.startsWith("lio/flutter/")) hasFlutter = true
+                                    if (!hasCompose && lower.startsWith("landroidx/compose/")) hasCompose = true
+                                    if (!hasMenuDex &&
+                                        (lower == "landroid/view/menu;" || lower == "landroid/view/menuitem;")
+                                    ) {
+                                        hasMenuDex = true
+                                    }
+                                    if (!hasGPlayUpdate &&
+                                        lower.contains("lcom/google/android/play/core/appupdate")
+                                    ) {
+                                        hasGPlayUpdate = true
+                                    }
+                                    if (!hasRuStoreUpdate &&
+                                        lower.contains("lru/rustore/sdk/appupdate")
+                                    ) {
+                                        hasRuStoreUpdate = true
+                                    }
+                                    for ((marker, name) in ADS) {
+                                        if (lower.contains(marker)) adsFound.add(name)
+                                    }
+                                    for ((marker, name) in ANALYTICS) {
+                                        if (lower.contains(marker)) analyticsFound.add(name)
+                                    }
+                                    for ((marker, name) in MODULES_DEX) {
+                                        if (lower.contains(marker)) modulesFound.add(name)
+                                    }
+                                    for ((marker, name) in PROTECTIONS_DEX) {
+                                        if (lower.contains(marker)) protectionsFound.add(name)
+                                    }
+                                }
                             }
                         }
-                        n.startsWith("res/") || n == "resources.arsc" -> resBytes += e.size
+                        n == "resources.arsc" -> {
+                            resBytes += e.size
+                            arscSize = e.size
+                        }
+                        n.startsWith("res/") -> resBytes += e.size
                         n.startsWith("assets/") -> {
                             assetsBytes += e.size
                             if (n.startsWith("assets/flutter_assets/")) hasFlutter = true
                         }
-                        n.startsWith("lib/") -> { libBytes += e.size; if (n.endsWith("libflutter.so")) hasFlutter = true }
+                        n.startsWith("lib/") -> {
+                            libBytes += e.size
+                            if (n.endsWith("libflutter.so")) hasFlutter = true
+                        }
                         else -> otherBytes += e.size
                     }
                 }
@@ -152,6 +289,49 @@ object ApkInspector {
 
         sb.append("💰 ").append(context.getString(R.string.insp_ads, if (adsFound.isEmpty()) context.getString(R.string.insp_none) else adsFound.joinToString(", "))).append("\n")
         sb.append("📊 ").append(context.getString(R.string.insp_analytics, if (analyticsFound.isEmpty()) context.getString(R.string.insp_none) else analyticsFound.joinToString(", "))).append("\n")
+        sb.append("📦 ").append(
+            context.getString(
+                R.string.insp_modules,
+                if (modulesFound.isEmpty()) context.getString(R.string.insp_none_plural)
+                else modulesFound.joinToString(", ")
+            )
+        ).append("\n")
+        sb.append("🛡 ").append(
+            context.getString(
+                R.string.insp_protections,
+                if (protectionsFound.isEmpty()) context.getString(R.string.insp_none_plural)
+                else protectionsFound.joinToString(", ")
+            )
+        ).append("\n")
+        if (!hasFlutter) {
+            when {
+                hasMenuXml && hasCompose -> sb.append(context.getString(R.string.insp_menu_compose_xml))
+                hasMenuXml -> sb.append(context.getString(R.string.insp_menu_xml_available))
+                hasMenuDex -> sb.append(context.getString(R.string.insp_menu_dex_unavailable))
+                else -> sb.append(context.getString(R.string.insp_menu_unknown))
+            }
+            sb.append("\n")
+        }
+        if (arscSize in 1L..16L * 1024 * 1024) {
+            stringCounts = countStringLocales(apk)
+            val counts = stringCounts
+            if (counts != null) {
+                sb.append(
+                    context.getString(R.string.insp_string_counts, counts.total, counts.russian)
+                ).append("\n")
+                val missing = counts.total - counts.russian
+                if (counts.total > 0 &&
+                    (counts.russian == 0 ||
+                        (missing >= 20 && counts.russian < counts.total * 0.9))
+                ) {
+                    sb.append(
+                        "⚠ " + context.getString(R.string.insp_translation_needed, missing)
+                    ).append("\n")
+                }
+            }
+        } else if (arscSize > 16L * 1024 * 1024) {
+            sb.append("⚠ ").append(context.getString(R.string.insp_string_counts_skipped)).append("\n")
+        }
         val upd = mutableListOf<String>()
         if (hasGPlayUpdate) upd.add("Google Play")
         if (hasRuStoreUpdate) upd.add("RuStore")
@@ -167,6 +347,7 @@ object ApkInspector {
             }
         } catch (_: Throwable) {
         }
+        if (stringCounts?.defaultIsRussian == true) langs.add("ru")
         try {
             found.addAll(DexPatcher.readDefaultStringValues(apk, FIND_NEEDLES, 8))
         } catch (_: Throwable) {
@@ -191,23 +372,76 @@ object ApkInspector {
         return sb.toString()
     }
 
+    /**
+     * Counts string resources in values/ and values-ru/. The ARSC table is only
+     * loaded for reasonably small APKs: very large resource tables can exhaust
+     * the app heap and are not worth an inspector query.
+     */
+    private fun countStringLocales(apk: File): StringCounts? {
+        return try {
+            val module = ApkModule.loadApkFile(apk)
+            try {
+                val defaultConfig = ResConfig.getDefault()
+                val ruConfig = ResConfig.parse("ru")
+                var baseCount = 0
+                var ruCount = 0
+                var defaultSamples = 0
+                var defaultCyrillic = 0
+                for (pkg in module.tableBlock.listPackages()) {
+                    val strings = pkg.getResources("string")
+                    while (strings.hasNext()) {
+                        val entry = strings.next()
+                        val base = entry.get(defaultConfig) ?: entry.get()
+                        if (base != null && !base.isNull() && base.getValueAsString() != null) {
+                            baseCount++
+                            val text = base.getValueAsString() ?: ""
+                            if (text.length >= 2) {
+                                defaultSamples++
+                                if (hasCyrillic(text)) defaultCyrillic++
+                            }
+                        }
+                        val ru = entry.get(ruConfig)
+                        if (ru != null && !ru.isNull() && ru.getValueAsString() != null) {
+                            ruCount++
+                        }
+                    }
+                }
+                val defaultIsRussian = defaultSamples >= 10 &&
+                    defaultCyrillic * 100 / defaultSamples >= 50
+                StringCounts(
+                    total = baseCount,
+                    russian = if (defaultIsRussian) baseCount else ruCount,
+                    defaultIsRussian = defaultIsRussian
+                )
+            } finally {
+                module.close()
+            }
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
     private fun readAll(zip: ZipFile, name: String): ByteArray {
         return zip.getInputStream(zip.getEntry(name)).use { it.readBytes() }
     }
 
-    /** Поиск подстроки в байтах dex (маркеры — в нижнем регистре, как в путях классов). */
-    private fun containsBytes(hay: ByteArray, needle: String): Boolean {
-        val n = needle.toByteArray(Charsets.US_ASCII)
-        if (n.isEmpty() || hay.size < n.size) return false
-        var i = 0
-        val end = hay.size - n.size
-        while (i <= end) {
-            if (hay[i] == n[0]) {
-                var j = 1
-                while (j < n.size && hay[i + j] == n[j]) j++
-                if (j == n.size) return true
+    /**
+     * Reads actual DEX type descriptors, not raw bytes. This avoids matching
+     * marker strings that an app (including this inspector) embeds as data.
+     */
+    private fun scanDexTypes(bytes: ByteArray, onType: (String) -> Unit) {
+        try {
+            val dex = DexBackedDexFile(Opcodes.getDefault(), bytes)
+            for (type in dex.typeSection) {
+                onType(type)
             }
-            i++
+        } catch (_: Throwable) {
+        }
+    }
+
+    private fun hasCyrillic(value: String): Boolean {
+        for (ch in value) {
+            if (ch in '\u0400'..'\u04FF') return true
         }
         return false
     }

@@ -727,6 +727,8 @@
 
     <string name="translator_label">Translator:</string>
 
+    <string name="target_language_label">Target language:</string>
+
     <string name="translator_google">Google</string>
 
     <string name="translator_mymemory">MyMemory</string>
@@ -741,7 +743,9 @@
 
     <string name="deepl_key_hint">DeepL key</string>
 
-    <string name="start_translate">Start translation</string>
+    <string name="start_translate">Editor</string>
+
+    <string name="translate_rows_action">Translate</string>
 
     <string name="dictionary_translate_action">Translate</string>
 
@@ -754,6 +758,18 @@
     <string name="status_translating">Translating: %1$d of %2$d…</string>
 
     <string name="translations_preview">Preview: %1$d strings</string>
+
+    <string name="translation_editor_title">Original and translation</string>
+
+    <string name="original_label">Original</string>
+
+    <string name="translated_label">Translation</string>
+
+    <string name="translation_editor_count">Strings: %1$d</string>
+
+    <string name="translation_editor_excluded">excluded: %1$d</string>
+
+    <string name="translation_editor_loading">Loading strings…</string>
 
     <string name="apply_translations">Apply translation</string>
 
@@ -769,9 +785,9 @@
 
     <string name="err_translate_failed">Translation error: %1$s</string>
 
-    <string name="translations_applied">✅ Translations applied (Russian locale)</string>
+    <string name="translations_applied">✅ Translations applied: %1$s</string>
 
-    <string name="status_translations_write">Writing Russian locale…</string>
+    <string name="status_translations_write">Writing locale: %1$s…</string>
 
     <string name="preview_truncated">…showing first %1$d strings</string>    <string name="translations_edit_hint">You can edit translations directly in the list</string>    <string name="mode_label">Mode:</string>
 
@@ -803,13 +819,33 @@
 
     <string name="insp_type_normal">✔ Standard app — all tools available</string>
 
-    <string name="insp_type_compose">⚠ Jetpack Compose — menu item hiding is not available</string>
+    <string name="insp_type_compose">⚠ Jetpack Compose — some menu items may be built in code</string>
 
-    <string name="insp_type_flutter">⚠ Flutter (Dart) — menu item hiding is not available</string>
+    <string name="insp_type_flutter">🚨 Flutter (Dart)</string>
 
     <string name="insp_ads">💰 Ads: %1$s</string>
 
     <string name="insp_analytics">📊 Analytics: %1$s</string>
+
+    <string name="insp_modules">📦 Modules: %1$s</string>
+
+    <string name="insp_protections">🛡 Protections: %1$s</string>
+
+    <string name="insp_none_plural">none found</string>
+
+    <string name="insp_menu_xml_available">✅ Menu item hiding is available (XML).</string>
+
+    <string name="insp_menu_compose_xml">✅ XML menus found: their items can be hidden; Compose items cannot.</string>
+
+    <string name="insp_menu_dex_unavailable">⚠ Menu items are in DEX, not XML — hiding via XML is unavailable.</string>
+
+    <string name="insp_menu_unknown">❔ No XML menu found — check manually.</string>
+
+    <string name="insp_string_counts">📝 Strings: %1$d, Russian: %2$d</string>
+
+    <string name="insp_translation_needed">⚠ Translation needed: %1$d strings missing</string>
+
+    <string name="insp_string_counts_skipped">⚠ String count skipped: resources.arsc is over 16 MB</string>
 
     <string name="insp_none">none found</string>
 

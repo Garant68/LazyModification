@@ -723,6 +723,8 @@
 
     <string name="translator_label">Переводчик:</string>
 
+    <string name="target_language_label">Язык перевода:</string>
+
     <string name="translator_google">Google</string>
 
     <string name="translator_mymemory">MyMemory</string>
@@ -737,7 +739,9 @@
 
     <string name="deepl_key_hint">Ключ DeepL</string>
 
-    <string name="start_translate">Начать перевод</string>
+    <string name="start_translate">Редактор</string>
+
+    <string name="translate_rows_action">Перевести</string>
 
     <string name="dictionary_translate_action">Перевести</string>
 
@@ -750,6 +754,18 @@
     <string name="status_translating">Перевод: %1$d из %2$d…</string>
 
     <string name="translations_preview">Предпросмотр: %1$d строк</string>
+
+    <string name="translation_editor_title">Оригинал и перевод</string>
+
+    <string name="original_label">Оригинал</string>
+
+    <string name="translated_label">Перевод</string>
+
+    <string name="translation_editor_count">Строк: %1$d</string>
+
+    <string name="translation_editor_excluded">исключено: %1$d</string>
+
+    <string name="translation_editor_loading">Загрузка строк…</string>
 
     <string name="apply_translations">Применить перевод</string>
 
@@ -765,9 +781,9 @@
 
     <string name="err_translate_failed">Ошибка перевода: %1$s</string>
 
-    <string name="translations_applied">✅ Переводы применены (русская локаль)</string>
+    <string name="translations_applied">✅ Переводы применены: %1$s</string>
 
-    <string name="status_translations_write">Запись русской локали…</string>
+    <string name="status_translations_write">Запись локали: %1$s…</string>
 
     <string name="preview_truncated">…показаны первые %1$d строк</string>    <string name="translations_edit_hint">Переводы можно редактировать прямо в списке</string>    <string name="mode_label">Режим:</string>
 
@@ -799,13 +815,33 @@
 
     <string name="insp_type_normal">✔ Обычное приложение — доступны все инструменты</string>
 
-    <string name="insp_type_compose">⚠ Jetpack Compose — скрытие пунктов меню недоступно</string>
+    <string name="insp_type_compose">⚠ Jetpack Compose — часть меню может быть в коде</string>
 
-    <string name="insp_type_flutter">⚠ Flutter (Dart) — скрытие пунктов меню недоступно</string>
+    <string name="insp_type_flutter">🚨 Flutter (Dart)</string>
 
     <string name="insp_ads">💰 Реклама: %1$s</string>
 
     <string name="insp_analytics">📊 Аналитика: %1$s</string>
+
+    <string name="insp_modules">📦 Модули: %1$s</string>
+
+    <string name="insp_protections">🛡 Защиты: %1$s</string>
+
+    <string name="insp_none_plural">не найдены</string>
+
+    <string name="insp_menu_xml_available">✅ Скрытие пунктов меню доступно (XML).</string>
+
+    <string name="insp_menu_compose_xml">✅ XML-меню найдены: их пункты можно скрыть; пункты Compose — нет.</string>
+
+    <string name="insp_menu_dex_unavailable">⚠ Пункты меню находятся в DEX, а не в XML — скрытие через XML недоступно.</string>
+
+    <string name="insp_menu_unknown">❔ XML-меню не найдено — проверьте вручную.</string>
+
+    <string name="insp_string_counts">📝 Строк: %1$d, русских: %2$d</string>
+
+    <string name="insp_translation_needed">⚠ Необходим доперевод: не хватает %1$d строк</string>
+
+    <string name="insp_string_counts_skipped">⚠ Подсчёт строк пропущен: resources.arsc больше 16 МБ</string>
 
     <string name="insp_none">не найдена</string>
 

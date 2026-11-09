@@ -711,6 +711,8 @@
 
     <string name="translator_label">Преводач:</string>
 
+    <string name="target_language_label">Език за превод:</string>
+
     <string name="translator_google">Google</string>
 
     <string name="translator_mymemory">MyMemory</string>
@@ -725,7 +727,9 @@
 
     <string name="deepl_key_hint">Ключ за DeepL</string>
 
-    <string name="start_translate">Започни превод</string>
+    <string name="start_translate">Редактор</string>
+
+    <string name="translate_rows_action">Преведи</string>
 
     <string name="dictionary_translate_action">Преведи</string>
 
@@ -738,6 +742,18 @@
     <string name="status_translating">Превод: %1$d от %2$d…</string>
 
     <string name="translations_preview">Преглед: %1$d низа</string>
+
+    <string name="translation_editor_title">Оригинал и превод</string>
+
+    <string name="original_label">Оригинал</string>
+
+    <string name="translated_label">Превод</string>
+
+    <string name="translation_editor_count">Низове: %1$d</string>
+
+    <string name="translation_editor_excluded">изключени: %1$d</string>
+
+    <string name="translation_editor_loading">Зареждане на низове…</string>
 
     <string name="apply_translations">Приложи превода</string>
 
@@ -753,9 +769,9 @@
 
     <string name="err_translate_failed">Грешка при превод: %1$s</string>
 
-    <string name="translations_applied">✅ Преводите са приложени (руска локализация)</string>
+    <string name="translations_applied">✅ Преводите са приложени: %1$s</string>
 
-    <string name="status_translations_write">Записване на руска локализация…</string>
+    <string name="status_translations_write">Записване на локализация: %1$s…</string>
 
     <string name="preview_truncated">…показани първите %1$d низа</string>    <string name="translations_edit_hint">Преводите могат да се редактират директно в списъка</string>    <string name="mode_label">Режим:</string>
 
@@ -787,13 +803,33 @@
 
     <string name="insp_type_normal">✔ Обикновено приложение — всички инструменти са налични</string>
 
-    <string name="insp_type_compose">⚠ Jetpack Compose — скриването на елементи не е налично</string>
+    <string name="insp_type_compose">⚠ Jetpack Compose — част от менюто може да е в кода</string>
 
-    <string name="insp_type_flutter">⚠ Flutter (Dart) — скриването на елементи не е налично</string>
+    <string name="insp_type_flutter">🚨 Flutter (Dart)</string>
 
     <string name="insp_ads">💰 Реклама: %1$s</string>
 
     <string name="insp_analytics">📊 Аналитика: %1$s</string>
+
+    <string name="insp_modules">📦 Модули: %1$s</string>
+
+    <string name="insp_protections">🛡 Защити: %1$s</string>
+
+    <string name="insp_none_plural">не са намерени</string>
+
+    <string name="insp_menu_xml_available">✅ Скриването на елементи от менюто е достъпно (XML).</string>
+
+    <string name="insp_menu_compose_xml">✅ Намерени са XML менюта: елементите им могат да се скрият; елементите на Compose — не.</string>
+
+    <string name="insp_menu_dex_unavailable">⚠ Елементите на менюто са в DEX, а не в XML — скриването през XML не е достъпно.</string>
+
+    <string name="insp_menu_unknown">❔ XML меню не е намерено — проверете ръчно.</string>
+
+    <string name="insp_string_counts">📝 Низове: %1$d, руски: %2$d</string>
+
+    <string name="insp_translation_needed">⚠ Необходим е допълнителен превод: липсват %1$d низа</string>
+
+    <string name="insp_string_counts_skipped">⚠ Преброяването е пропуснато: resources.arsc е над 16 МБ</string>
 
     <string name="insp_none">не е намерена</string>
 
