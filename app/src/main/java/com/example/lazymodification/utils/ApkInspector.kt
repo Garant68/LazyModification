@@ -111,7 +111,7 @@ object ApkInspector {
         "libsgsecuritybody" to "Alibaba Security",
         "libdexhelper" to "DexHelper",
         "libprotectclass" to "DexProtector",
-        "libpairip" to "Play Integrity"
+        "pairip" to "Pairip (Google Play)"
     )
 
     private val PROTECTIONS_DEX = listOf(
@@ -122,6 +122,7 @@ object ApkInspector {
         "com/qihoo" to "360 Jiagu",
         "com/tencent/stubshell" to "Tencent Legu",
         "com/tencent/legu" to "Tencent Legu",
+        "com/pairip" to "Pairip (Google Play)",
         "com/google/android/play/core/integrity" to "Play Integrity",
         "com/google/android/gms/safetynet" to "SafetyNet",
         "safetynet" to "SafetyNet",
@@ -153,6 +154,7 @@ object ApkInspector {
         var version = "?"
         var minSdk = 0
         var targetSdk = 0
+        var manifestAppClass = ""
         try {
             val pi = context.packageManager.getPackageArchiveInfo(apk.absolutePath, 0)
             if (pi != null) {
@@ -164,6 +166,7 @@ object ApkInspector {
                     ai.sourceDir = apk.absolutePath
                     ai.publicSourceDir = apk.absolutePath
                     label = ai.loadLabel(context.packageManager).toString()
+                    manifestAppClass = ai.className ?: ""
                 }
                 if (android.os.Build.VERSION.SDK_INT >= 24) {
                     minSdk = pi.applicationInfo?.minSdkVersion ?: 0
@@ -191,6 +194,9 @@ object ApkInspector {
         val analyticsFound = LinkedHashSet<String>()
         val modulesFound = LinkedHashSet<String>()
         val protectionsFound = LinkedHashSet<String>()
+        if (manifestAppClass.contains("pairip", ignoreCase = true)) {
+            protectionsFound.add("Pairip (Google Play)")
+        }
         var dexBytes = 0L
         var resBytes = 0L
         var assetsBytes = 0L
