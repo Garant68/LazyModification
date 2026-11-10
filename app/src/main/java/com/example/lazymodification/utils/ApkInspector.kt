@@ -111,7 +111,7 @@ object ApkInspector {
         "libsgsecuritybody" to "Alibaba Security",
         "libdexhelper" to "DexHelper",
         "libprotectclass" to "DexProtector",
-        "pairip" to "Pairip (Google Play)"
+        "libpairipcore" to "Pairip (Google Play)"
     )
 
     private val PROTECTIONS_DEX = listOf(
@@ -122,7 +122,6 @@ object ApkInspector {
         "com/qihoo" to "360 Jiagu",
         "com/tencent/stubshell" to "Tencent Legu",
         "com/tencent/legu" to "Tencent Legu",
-        "com/pairip" to "Pairip (Google Play)",
         "com/google/android/play/core/integrity" to "Play Integrity",
         "com/google/android/gms/safetynet" to "SafetyNet",
         "safetynet" to "SafetyNet",
@@ -135,7 +134,6 @@ object ApkInspector {
         "magisk" to "Root detection (Magisk)",
         "superuser" to "Root detection",
         "certificatepinner" to "Certificate pinning",
-        "x509trustmanager" to "Custom TrustManager",
         "goldfish" to "Emulator detection",
         "ranchu" to "Emulator detection"
     )
@@ -194,8 +192,9 @@ object ApkInspector {
         val analyticsFound = LinkedHashSet<String>()
         val modulesFound = LinkedHashSet<String>()
         val protectionsFound = LinkedHashSet<String>()
+        val licenseChecksFound = LinkedHashSet<String>()
         if (manifestAppClass.contains("pairip", ignoreCase = true)) {
-            protectionsFound.add("Pairip (Google Play)")
+            licenseChecksFound.add("Pairip application wrapper")
         }
         var dexBytes = 0L
         var resBytes = 0L
@@ -257,6 +256,9 @@ object ApkInspector {
                                     for ((marker, name) in PROTECTIONS_DEX) {
                                         if (lower.contains(marker)) protectionsFound.add(name)
                                     }
+                                    if (lower.contains("lcom/pairip/licensecheck/")) {
+                                        licenseChecksFound.add("Pairip LicenseClient")
+                                    }
                                 }
                             }
                         }
@@ -309,6 +311,14 @@ object ApkInspector {
                 else protectionsFound.joinToString(", ")
             )
         ).append("\n")
+        if (licenseChecksFound.isNotEmpty()) {
+            sb.append(
+                context.getString(
+                    R.string.insp_license_check,
+                    licenseChecksFound.joinToString(", ")
+                )
+            ).append("\n")
+        }
         if (!hasFlutter) {
             when {
                 hasMenuXml && hasCompose -> sb.append(context.getString(R.string.insp_menu_compose_xml))

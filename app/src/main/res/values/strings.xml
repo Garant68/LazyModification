@@ -827,6 +827,8 @@
 
     <string name="insp_protections">🛡 Защиты: %1$s</string>
 
+    <string name="insp_license_check">🔑 Проверка лицензии: %1$s — редирект в Play Маркет, не защита APK</string>
+
     <string name="insp_none_plural">не найдены</string>
 
     <string name="insp_menu_xml_available">✅ Скрытие пунктов меню доступно (XML).</string>

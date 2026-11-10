@@ -831,6 +831,8 @@
 
     <string name="insp_protections">🛡 Protections: %1$s</string>
 
+    <string name="insp_license_check">🔑 License check: %1$s — Play Store redirect, not APK protection</string>
+
     <string name="insp_none_plural">none found</string>
 
     <string name="insp_menu_xml_available">✅ Menu item hiding is available (XML).</string>
