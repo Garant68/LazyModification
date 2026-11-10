@@ -194,7 +194,7 @@ object ApkInspector {
         val protectionsFound = LinkedHashSet<String>()
         val licenseChecksFound = LinkedHashSet<String>()
         if (manifestAppClass.contains("pairip", ignoreCase = true)) {
-            licenseChecksFound.add("Pairip application wrapper")
+            licenseChecksFound.add("Application wrapper")
         }
         var dexBytes = 0L
         var resBytes = 0L
@@ -257,7 +257,7 @@ object ApkInspector {
                                         if (lower.contains(marker)) protectionsFound.add(name)
                                     }
                                     if (lower.contains("lcom/pairip/licensecheck/")) {
-                                        licenseChecksFound.add("Pairip LicenseClient")
+                                        licenseChecksFound.add("LicenseClient")
                                     }
                                 }
                             }
