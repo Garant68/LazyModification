@@ -505,16 +505,9 @@ class TranslationEditorActivity : AppCompatActivity() {
                 try {
                     val cacheKey = cache.key(provider, "auto", target, row.original)
                     var result = cache.get(cacheKey)
-                    if (result == null) {
-                        result = AppTranslator.translateOnce(
-                            provider,
-                            key,
-                            region,
-                            "auto",
-                            target,
-                            row.original
-                        )
-                        cache.put(cacheKey, result)
+                    if (result.isNullOrBlank()) {
+                        result = translateWithRetry(provider, key, region, target, row.original)
+                        if (result.isNotBlank()) cache.put(cacheKey, result)
                     }
                     if (result.isBlank()) {
                         // Short labels (note names such as "La", "Do", "Sol")
@@ -539,7 +532,7 @@ class TranslationEditorActivity : AppCompatActivity() {
                         }
                     } else {
                         failed++
-                        Log.w(TAG, "skip: ${e.message}")
+                        Log.w(TAG, "skip '${row.original.take(80)}': ${e.message}")
                     }
                 }
                 done++
@@ -566,6 +559,51 @@ class TranslationEditorActivity : AppCompatActivity() {
                 }
             }
         }.start()
+    }
+
+    /**
+     * Google occasionally returns an empty response or a transient HTTP error
+     * for one string. Retry only retryable failures so a real 4xx response
+     * does not turn into a long delay for every row.
+     */
+    private fun translateWithRetry(
+        provider: String,
+        key: String?,
+        region: String?,
+        target: String,
+        text: String
+    ): String {
+        var last: Throwable? = null
+        for (attempt in 0..2) {
+            try {
+                val result = AppTranslator.translateOnce(
+                    provider,
+                    key,
+                    region,
+                    "auto",
+                    target,
+                    text
+                )
+                if (result.isNotBlank()) return result
+                last = IllegalStateException("empty translation")
+            } catch (e: Throwable) {
+                last = e
+            }
+            if (attempt < 2) {
+                val message = last?.message.orEmpty().lowercase()
+                val retryable = message.isBlank() ||
+                    message.contains("empty") ||
+                    message.contains("timeout") ||
+                    message.contains("http 429") ||
+                    message.contains("http 5") ||
+                    message.contains("connect") ||
+                    message.contains("socket") ||
+                    message.contains("network")
+                if (!retryable) break
+                Thread.sleep(400L * (attempt + 1))
+            }
+        }
+        throw last ?: IllegalStateException("translation failed")
     }
 
     private fun updateButtons() {
