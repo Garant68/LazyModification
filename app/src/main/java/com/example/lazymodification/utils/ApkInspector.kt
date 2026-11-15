@@ -340,11 +340,6 @@ object ApkInspector {
                 translationNeeded = counts.total > 0 &&
                     (counts.russian == 0 ||
                         (missing >= 20 && counts.russian < counts.total * 0.9))
-                if (translationNeeded) {
-                    sb.append(
-                        "⚠ " + context.getString(R.string.insp_translation_needed, missing)
-                    ).append("\n")
-                }
             }
         } else if (arscSize > 16L * 1024 * 1024) {
             sb.append("⚠ ").append(context.getString(R.string.insp_string_counts_skipped)).append("\n")
