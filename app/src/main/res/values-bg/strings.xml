@@ -839,6 +839,8 @@
 
     <string name="insp_ru_yes">✔ руски има — превод не е нужен</string>
 
+    <string name="insp_ru_partial">✔ руски има, но преводът е непълен — липсват %1$d низа</string>
+
     <string name="insp_ru_no">✖ няма руски — може да се преведе (Превод на приложението)</string>
 
     <string name="insp_found">🎯 Намерено: %1$s</string>

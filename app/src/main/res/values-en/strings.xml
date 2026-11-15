@@ -855,6 +855,8 @@
 
     <string name="insp_ru_yes">✔ Russian present — translation not needed</string>
 
+    <string name="insp_ru_partial">✔ Russian exists, but the translation is incomplete — %1$d strings missing</string>
+
     <string name="insp_ru_no">✖ No Russian — you can translate (Translate app)</string>
 
     <string name="insp_found">🎯 Found: %1$s</string>

@@ -203,6 +203,7 @@ object ApkInspector {
         var otherBytes = 0L
         var arscSize = 0L
         var stringCounts: StringCounts? = null
+        var translationNeeded = false
 
         try {
             ZipFile(apk).use { zip ->
@@ -336,10 +337,10 @@ object ApkInspector {
                     context.getString(R.string.insp_string_counts, counts.total, counts.russian)
                 ).append("\n")
                 val missing = counts.total - counts.russian
-                if (counts.total > 0 &&
+                translationNeeded = counts.total > 0 &&
                     (counts.russian == 0 ||
                         (missing >= 20 && counts.russian < counts.total * 0.9))
-                ) {
+                if (translationNeeded) {
                     sb.append(
                         "⚠ " + context.getString(R.string.insp_translation_needed, missing)
                     ).append("\n")
@@ -372,7 +373,17 @@ object ApkInspector {
             val preview = langs.take(8).joinToString(", ")
             sb.append("🌍 ").append(context.getString(R.string.insp_locales, langs.size, preview)).append("\n")
         }
-        sb.append(if (langs.contains("ru")) context.getString(R.string.insp_ru_yes) else context.getString(R.string.insp_ru_no)).append("\n")
+        val hasRussian = langs.contains("ru") || (stringCounts?.russian ?: 0) > 0
+        sb.append(
+            when {
+                hasRussian && translationNeeded -> {
+                    val missing = (stringCounts?.total ?: 0) - (stringCounts?.russian ?: 0)
+                    context.getString(R.string.insp_ru_partial, missing)
+                }
+                hasRussian -> context.getString(R.string.insp_ru_yes)
+                else -> context.getString(R.string.insp_ru_no)
+            }
+        ).append("\n")
 
         val total = (dexBytes + resBytes + assetsBytes + libBytes + otherBytes).coerceAtLeast(1L)
         fun pct(v: Long) = (v * 100 / total).toInt()

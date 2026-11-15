@@ -851,6 +851,8 @@
 
     <string name="insp_ru_yes">✔ русский есть — перевод не нужен</string>
 
+    <string name="insp_ru_partial">✔ русский есть, но перевод неполный — не хватает %1$d строк</string>
+
     <string name="insp_ru_no">✖ русского нет — можно перевести (Перевести приложение)</string>
 
     <string name="insp_found">🎯 Найдено: %1$s</string>
