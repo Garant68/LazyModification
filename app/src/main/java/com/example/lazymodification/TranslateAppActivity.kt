@@ -79,7 +79,7 @@ class TranslateAppActivity : AppCompatActivity() {
     private lateinit var rgMode: RadioGroup
     private lateinit var rbModeFull: RadioButton
     private lateinit var rbModeFast: RadioButton
-    private lateinit var cbTranslateDex: CheckBox
+    private lateinit var rbTranslateDex: RadioButton
     private lateinit var cbDictionary: CheckBox
     private lateinit var llDictionary: LinearLayout
     private lateinit var tvDictionaryName: TextView
@@ -221,7 +221,7 @@ class TranslateAppActivity : AppCompatActivity() {
         rgMode = findViewById(R.id.rgMode)
         rbModeFull = findViewById(R.id.rbModeFull)
         rbModeFast = findViewById(R.id.rbModeFast)
-        cbTranslateDex = findViewById(R.id.cbTranslateDex)
+        rbTranslateDex = findViewById(R.id.rbTranslateDex)
         cbDictionary = findViewById(R.id.cbDictionary)
         llDictionary = findViewById(R.id.llDictionary)
         tvDictionaryName = findViewById(R.id.tvDictionaryName)
@@ -375,7 +375,7 @@ class TranslateAppActivity : AppCompatActivity() {
     /** Быстрый режим: перевод вручную введённых строк через DeepL Free. */
     private fun updateModeUI() {
         val fast = rbModeFast.isChecked
-        cbTranslateDex.visibility = if (fast) View.GONE else View.VISIBLE
+        rbTranslateDex.visibility = if (fast) View.GONE else View.VISIBLE
         llTranslatorSection.visibility = if (fast) View.GONE else View.VISIBLE
         llFastInput.visibility = if (fast) View.VISIBLE else View.GONE
         if (fast) {
@@ -451,7 +451,7 @@ class TranslateAppActivity : AppCompatActivity() {
         val intent = Intent(this, TranslationEditorActivity::class.java).apply {
             putExtra(TranslationEditorActivity.EXTRA_APK_PATH, apkPath)
             putExtra(TranslationEditorActivity.EXTRA_TARGET_LANGUAGE, targetLanguage)
-            putExtra(TranslationEditorActivity.EXTRA_TRANSLATE_DEX, cbTranslateDex.isChecked)
+            putExtra(TranslationEditorActivity.EXTRA_TRANSLATE_DEX, rbTranslateDex.isChecked)
             putExtra(TranslationEditorActivity.EXTRA_PROVIDER, provider)
             putExtra(TranslationEditorActivity.EXTRA_AZURE_KEY, etAzureKey.text.toString().trim())
             putExtra(TranslationEditorActivity.EXTRA_AZURE_REGION, etAzureRegion.text.toString().trim())
