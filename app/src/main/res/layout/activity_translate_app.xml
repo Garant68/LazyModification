@@ -191,61 +191,30 @@
 
                 </LinearLayout>
 
-                <TextView
-                    android:id="@+id/tvTranslatorLabel"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/translator_label"
-                    android:textSize="16sp"
-                    android:textColor="?attr/colorOnSurface"
-                    android:layout_marginTop="8dp"/>
-
-                <androidx.core.widget.NestedScrollView
-                    android:id="@+id/scrollTranslator"
+                <LinearLayout
+                    android:id="@+id/llTranslatorSection"
                     android:layout_width="match_parent"
-                    android:layout_height="180dp"
-                    android:layout_marginTop="4dp"
-                    android:fillViewport="true"
-                    android:overScrollMode="ifContentScrolls"
-                    android:scrollbars="none">
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginTop="10dp">
 
-                    <RadioGroup
-                        android:id="@+id/rgTranslator"
+                    <TextView
+                        android:id="@+id/tvTranslatorLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/translator_label"
+                        android:textSize="16sp"
+                        android:textColor="?attr/colorOnSurface"/>
+
+                    <Spinner
+                        android:id="@+id/spTranslator"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content">
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:minHeight="48dp"
+                        android:spinnerMode="dropdown"/>
 
-                        <RadioButton
-                            android:id="@+id/rbGoogle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/translator_google"
-                            android:textSize="16sp"
-                            android:checked="true"/>
-
-                        <RadioButton
-                            android:id="@+id/rbMyMemory"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/translator_mymemory"
-                            android:textSize="16sp"/>
-
-                        <RadioButton
-                            android:id="@+id/rbAzure"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/translator_azure"
-                            android:textSize="16sp"/>
-
-                        <RadioButton
-                            android:id="@+id/rbDeepl"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/translator_deepl"
-                            android:textSize="16sp"/>
-
-                    </RadioGroup>
-
-                </androidx.core.widget.NestedScrollView>
+                </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/llAzure"

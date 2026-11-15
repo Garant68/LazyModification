@@ -27,7 +27,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
-import androidx.core.widget.NestedScrollView
 import com.example.lazymodification.utils.ApkUtils
 import com.example.lazymodification.utils.AppTranslator
 import com.example.lazymodification.utils.DexPatcher
@@ -68,6 +67,12 @@ class TranslateAppActivity : AppCompatActivity() {
         "nl", "pl", "cs", "sk", "ro", "hu", "el", "tr", "sr", "hr",
         "ar", "hi", "zh", "ja", "ko", "vi", "th", "id", "he"
     )
+    private val translatorProviders = listOf(
+        AppTranslator.GOOGLE,
+        AppTranslator.MYMEMORY,
+        AppTranslator.AZURE,
+        AppTranslator.DEEPL
+    )
 
     private lateinit var tvFileName: TextView
     private lateinit var spTargetLanguage: Spinner
@@ -79,15 +84,10 @@ class TranslateAppActivity : AppCompatActivity() {
     private lateinit var llDictionary: LinearLayout
     private lateinit var tvDictionaryName: TextView
     private lateinit var btnPickDictionary: MaterialButton
-    private lateinit var tvTranslatorLabel: TextView
-    private lateinit var scrollTranslator: NestedScrollView
+    private lateinit var llTranslatorSection: LinearLayout
+    private lateinit var spTranslator: Spinner
     private lateinit var llFastInput: LinearLayout
     private lateinit var etFastStrings: EditText
-    private lateinit var rgTranslator: RadioGroup
-    private lateinit var rbGoogle: RadioButton
-    private lateinit var rbMyMemory: RadioButton
-    private lateinit var rbAzure: RadioButton
-    private lateinit var rbDeepl: RadioButton
     private lateinit var llSetup: LinearLayout
     private lateinit var llAzure: LinearLayout
     private lateinit var etAzureKey: EditText
@@ -226,15 +226,10 @@ class TranslateAppActivity : AppCompatActivity() {
         llDictionary = findViewById(R.id.llDictionary)
         tvDictionaryName = findViewById(R.id.tvDictionaryName)
         btnPickDictionary = findViewById(R.id.btnPickDictionary)
-        tvTranslatorLabel = findViewById(R.id.tvTranslatorLabel)
-        scrollTranslator = findViewById(R.id.scrollTranslator)
+        llTranslatorSection = findViewById(R.id.llTranslatorSection)
+        spTranslator = findViewById(R.id.spTranslator)
         llFastInput = findViewById(R.id.llFastInput)
         etFastStrings = findViewById(R.id.etFastStrings)
-        rgTranslator = findViewById(R.id.rgTranslator)
-        rbGoogle = findViewById(R.id.rbGoogle)
-        rbMyMemory = findViewById(R.id.rbMyMemory)
-        rbAzure = findViewById(R.id.rbAzure)
-        rbDeepl = findViewById(R.id.rbDeepl)
         llSetup = findViewById(R.id.llSetup)
         llAzure = findViewById(R.id.llAzure)
         etAzureKey = findViewById(R.id.etAzureKey)
@@ -269,8 +264,8 @@ class TranslateAppActivity : AppCompatActivity() {
         }
         tvFileName.text = getString(R.string.file_label, file.name)
         setupTargetLanguage()
+        setupTranslator()
 
-        rgTranslator.setOnCheckedChangeListener { _, _ -> updateProviderFields() }
         rgMode.setOnCheckedChangeListener { _, _ -> updateModeUI() }
         cbDictionary.setOnCheckedChangeListener { _, checked ->
             llDictionary.visibility = if (checked) View.VISIBLE else View.GONE
@@ -330,6 +325,36 @@ class TranslateAppActivity : AppCompatActivity() {
         return display.replaceFirstChar { it.titlecase(Locale.getDefault()) }
     }
 
+    private fun setupTranslator() {
+        val labels = listOf(
+            getString(R.string.translator_google),
+            getString(R.string.translator_mymemory),
+            getString(R.string.translator_azure),
+            getString(R.string.translator_deepl)
+        )
+        val adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_item,
+            labels
+        ).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+        spTranslator.adapter = adapter
+        spTranslator.setSelection(0, false)
+        spTranslator.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(
+                parent: AdapterView<*>?,
+                view: View?,
+                position: Int,
+                id: Long
+            ) {
+                updateProviderFields()
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        }
+    }
+
     override fun onDestroy() {
         previewHandler.removeCallbacksAndMessages(null)
         previewGeneration++
@@ -337,24 +362,21 @@ class TranslateAppActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    private fun currentProvider(): String = when {
-        rbAzure.isChecked -> AppTranslator.AZURE
-        rbDeepl.isChecked -> AppTranslator.DEEPL
-        rbMyMemory.isChecked -> AppTranslator.MYMEMORY
-        else -> AppTranslator.GOOGLE
-    }
+    private fun currentProvider(): String =
+        translatorProviders.getOrNull(spTranslator.selectedItemPosition)
+            ?: AppTranslator.GOOGLE
 
     private fun updateProviderFields() {
-        llAzure.visibility = if (rbAzure.isChecked) View.VISIBLE else View.GONE
-        llDeepl.visibility = if (rbDeepl.isChecked) View.VISIBLE else View.GONE
+        val provider = currentProvider()
+        llAzure.visibility = if (provider == AppTranslator.AZURE) View.VISIBLE else View.GONE
+        llDeepl.visibility = if (provider == AppTranslator.DEEPL) View.VISIBLE else View.GONE
     }
 
     /** Быстрый режим: перевод вручную введённых строк через DeepL Free. */
     private fun updateModeUI() {
         val fast = rbModeFast.isChecked
         cbTranslateDex.visibility = if (fast) View.GONE else View.VISIBLE
-        tvTranslatorLabel.visibility = if (fast) View.GONE else View.VISIBLE
-        scrollTranslator.visibility = if (fast) View.GONE else View.VISIBLE
+        llTranslatorSection.visibility = if (fast) View.GONE else View.VISIBLE
         llFastInput.visibility = if (fast) View.VISIBLE else View.GONE
         if (fast) {
             llAzure.visibility = View.GONE
