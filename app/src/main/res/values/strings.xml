@@ -790,6 +790,7 @@
     <string name="mode_fast">Быстрый перевод</string>
 
     <string name="mode_full">Полный перевод</string>
+    <string name="translate_dex">Перевод Dex</string>
 
     <string name="fast_strings_hint">Строки для перевода, через запятую</string>
 

@@ -794,6 +794,7 @@
     <string name="mode_fast">Quick translation</string>
 
     <string name="mode_full">Full translation</string>
+    <string name="translate_dex">Translate DEX</string>
 
     <string name="fast_strings_hint">Strings to translate, comma-separated</string>
 

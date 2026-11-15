@@ -27,8 +27,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
+import androidx.core.widget.NestedScrollView
 import com.example.lazymodification.utils.ApkUtils
 import com.example.lazymodification.utils.AppTranslator
+import com.example.lazymodification.utils.DexPatcher
 import com.example.lazymodification.utils.FileSaver
 import com.example.lazymodification.utils.MtDictionary
 import com.example.lazymodification.utils.SignatureConfig
@@ -72,11 +74,13 @@ class TranslateAppActivity : AppCompatActivity() {
     private lateinit var rgMode: RadioGroup
     private lateinit var rbModeFull: RadioButton
     private lateinit var rbModeFast: RadioButton
+    private lateinit var cbTranslateDex: CheckBox
     private lateinit var cbDictionary: CheckBox
     private lateinit var llDictionary: LinearLayout
     private lateinit var tvDictionaryName: TextView
     private lateinit var btnPickDictionary: MaterialButton
     private lateinit var tvTranslatorLabel: TextView
+    private lateinit var scrollTranslator: NestedScrollView
     private lateinit var llFastInput: LinearLayout
     private lateinit var etFastStrings: EditText
     private lateinit var rgTranslator: RadioGroup
@@ -127,7 +131,8 @@ class TranslateAppActivity : AppCompatActivity() {
         val name: String,
         val original: String,
         var translated: String,
-        var excluded: Boolean = false
+        var excluded: Boolean = false,
+        val isDex: Boolean = false
     )
 
     private val rows = mutableListOf<Row>()
@@ -176,6 +181,7 @@ class TranslateAppActivity : AppCompatActivity() {
         val translations = data.getStringArrayListExtra(TranslationEditorActivity.EXTRA_TRANSLATIONS)
             ?: return@registerForActivityResult
         val excluded = data.getBooleanArrayExtra(TranslationEditorActivity.EXTRA_EXCLUDED)
+        val dexFlags = data.getBooleanArrayExtra(TranslationEditorActivity.EXTRA_DEX_FLAGS)
         if (ids.size != names.size || names.size != originals.size ||
             originals.size != translations.size
         ) return@registerForActivityResult
@@ -187,7 +193,8 @@ class TranslateAppActivity : AppCompatActivity() {
                     names[i],
                     originals[i],
                     translations[i],
-                    excluded?.getOrNull(i) == true
+                    excluded?.getOrNull(i) == true,
+                    dexFlags?.getOrNull(i) == true
                 )
             )
         }
@@ -214,11 +221,13 @@ class TranslateAppActivity : AppCompatActivity() {
         rgMode = findViewById(R.id.rgMode)
         rbModeFull = findViewById(R.id.rbModeFull)
         rbModeFast = findViewById(R.id.rbModeFast)
+        cbTranslateDex = findViewById(R.id.cbTranslateDex)
         cbDictionary = findViewById(R.id.cbDictionary)
         llDictionary = findViewById(R.id.llDictionary)
         tvDictionaryName = findViewById(R.id.tvDictionaryName)
         btnPickDictionary = findViewById(R.id.btnPickDictionary)
         tvTranslatorLabel = findViewById(R.id.tvTranslatorLabel)
+        scrollTranslator = findViewById(R.id.scrollTranslator)
         llFastInput = findViewById(R.id.llFastInput)
         etFastStrings = findViewById(R.id.etFastStrings)
         rgTranslator = findViewById(R.id.rgTranslator)
@@ -343,8 +352,9 @@ class TranslateAppActivity : AppCompatActivity() {
     /** Быстрый режим: перевод вручную введённых строк через DeepL Free. */
     private fun updateModeUI() {
         val fast = rbModeFast.isChecked
+        cbTranslateDex.visibility = if (fast) View.GONE else View.VISIBLE
         tvTranslatorLabel.visibility = if (fast) View.GONE else View.VISIBLE
-        rgTranslator.visibility = if (fast) View.GONE else View.VISIBLE
+        scrollTranslator.visibility = if (fast) View.GONE else View.VISIBLE
         llFastInput.visibility = if (fast) View.VISIBLE else View.GONE
         if (fast) {
             llAzure.visibility = View.GONE
@@ -419,6 +429,7 @@ class TranslateAppActivity : AppCompatActivity() {
         val intent = Intent(this, TranslationEditorActivity::class.java).apply {
             putExtra(TranslationEditorActivity.EXTRA_APK_PATH, apkPath)
             putExtra(TranslationEditorActivity.EXTRA_TARGET_LANGUAGE, targetLanguage)
+            putExtra(TranslationEditorActivity.EXTRA_TRANSLATE_DEX, cbTranslateDex.isChecked)
             putExtra(TranslationEditorActivity.EXTRA_PROVIDER, provider)
             putExtra(TranslationEditorActivity.EXTRA_AZURE_KEY, etAzureKey.text.toString().trim())
             putExtra(TranslationEditorActivity.EXTRA_AZURE_REGION, etAzureRegion.text.toString().trim())
@@ -850,17 +861,17 @@ class TranslateAppActivity : AppCompatActivity() {
         Thread {
             var notFound: List<String> = emptyList()
             try {
-                val work = File(cacheDir, "translate_${System.currentTimeMillis()}.apk")
+                var work = File(cacheDir, "translate_${System.currentTimeMillis()}.apk")
                 val module = ApkModule.loadApkFile(File(apkPath!!))
                 try {
                     // Rows without a translation must not blank out the
                     // original string. The editor can create a dictionary
                     // from a partially filled list as well.
                     val byId = rows
-                        .filter { it.resourceId != 0 && it.translated.isNotBlank() }
+                        .filter { !it.isDex && it.resourceId != 0 && it.translated.isNotBlank() }
                         .associateBy { it.resourceId }
                     val byValue = rows
-                        .filter { it.resourceId == 0 && it.translated.isNotBlank() }
+                        .filter { !it.isDex && it.resourceId == 0 && it.translated.isNotBlank() }
                         .associateBy { it.original }
                     val matchedValues = mutableSetOf<String>()
                     val targetConfig = ResConfig.parse(target)
@@ -894,6 +905,23 @@ class TranslateAppActivity : AppCompatActivity() {
                     module.writeApk(work)
                 } finally {
                     module.close()
+                }
+
+                val dexTranslations = rows
+                    .filter {
+                        it.isDex && it.translated.isNotBlank() &&
+                            (it.excluded || it.translated != it.original)
+                    }
+                    .associate { it.original to it.translated }
+                if (dexTranslations.isNotEmpty()) {
+                    val dexWork = File(cacheDir, "translate_dex_${System.currentTimeMillis()}.apk")
+                    val patched = DexPatcher.replaceStringLiteralsInApk(work, dexWork, dexTranslations)
+                    if (patched > 0) {
+                        work.delete()
+                        work = dexWork
+                    } else {
+                        dexWork.delete()
+                    }
                 }
 
                 runOnUiThread {

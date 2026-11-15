@@ -42,7 +42,10 @@ import java.io.EOFException
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.OutputStream
+import java.util.zip.CRC32
+import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
 
 data class PatchResult(
     val googlePlayPatched: Int = 0,
@@ -2203,5 +2206,208 @@ fun patchPackageName(inputDex: File, outputDex: File, oldPackage: String, newPac
         }
 
         return ImmutableMethodImplementation(1, instructions, emptyList(), emptyList())
+    }
+
+    // ============================================================
+    // ПЕРЕВОД СТРОК В DEX
+    // ============================================================
+
+    /**
+     * Replaces only exact string constants in classes*.dex. Resource files and
+     * other ZIP entries are copied without changes. The operation is opt-in:
+     * DEX string pools contain technical identifiers, so callers must pass a
+     * conservative migration map.
+     */
+    fun replaceStringLiteralsInApk(
+        inputApk: File,
+        outputApk: File,
+        replacements: Map<String, String>
+    ): Int {
+        val active = replacements.filter { it.key != it.value }
+        if (active.isEmpty()) {
+            inputApk.copyTo(outputApk, overwrite = true)
+            return 0
+        }
+
+        var total = 0
+        val dexPattern = Regex("^classes\\d*\\.dex$")
+        val tempDir = outputApk.parentFile ?: inputApk.parentFile ?: File(".")
+        try {
+            ZipFile(inputApk).use { zip ->
+                ZipOutputStream(BufferedOutputStream(FileOutputStream(outputApk))).use { out ->
+                    for (entry in zip.entries()) {
+                        if (entry.isDirectory) {
+                            val dir = ZipEntry(entry.name)
+                            if (entry.time >= 0) dir.time = entry.time
+                            out.putNextEntry(dir)
+                            out.closeEntry()
+                            continue
+                        }
+
+                        var data: ByteArray? = null
+                        if (dexPattern.matches(entry.name)) {
+                            val original = try {
+                                zip.getInputStream(entry).use { it.readBytes() }
+                            } catch (_: Throwable) {
+                                null
+                            }
+                            if (original != null) {
+                                val inTemp = File.createTempFile("lmdex_in_", ".dex", tempDir)
+                                val outTemp = File.createTempFile("lmdex_out_", ".dex", tempDir)
+                                try {
+                                    inTemp.writeBytes(original)
+                                    val changed = replaceStringLiteralsInDex(inTemp, outTemp, active)
+                                    if (changed > 0) {
+                                        total += changed
+                                        data = outTemp.readBytes()
+                                    }
+                                } catch (t: Throwable) {
+                                    android.util.Log.w(TAG, "DEX translation skipped ${entry.name}: ${t.message}")
+                                } finally {
+                                    inTemp.delete()
+                                    outTemp.delete()
+                                }
+                            }
+                        }
+
+                        val outEntry = ZipEntry(entry.name)
+                        if (entry.time >= 0) outEntry.time = entry.time
+                        outEntry.method = if (entry.method >= 0) entry.method else ZipEntry.DEFLATED
+                        if (outEntry.method == ZipEntry.STORED) {
+                            if (data != null) {
+                                outEntry.size = data.size.toLong()
+                                outEntry.compressedSize = data.size.toLong()
+                                val crc = CRC32()
+                                crc.update(data)
+                                outEntry.crc = crc.value
+                            } else {
+                                outEntry.size = entry.size
+                                outEntry.compressedSize = entry.size
+                                outEntry.crc = entry.crc
+                            }
+                        }
+
+                        out.putNextEntry(outEntry)
+                        if (data != null) {
+                            out.write(data)
+                        } else {
+                            zip.getInputStream(entry).use { it.copyTo(out) }
+                        }
+                        out.closeEntry()
+                    }
+                }
+            }
+        } catch (t: Throwable) {
+            android.util.Log.e(TAG, "DEX translation failed: ${t.message}", t)
+            try {
+                if (outputApk.exists()) outputApk.delete()
+                inputApk.copyTo(outputApk, overwrite = true)
+            } catch (_: Throwable) {
+            }
+            return 0
+        }
+        return total
+    }
+
+    private fun replaceStringLiteralsInDex(
+        inputDex: File,
+        outputDex: File,
+        replacements: Map<String, String>
+    ): Int {
+        val dex = DexFileFactory.loadDexFile(inputDex, null)
+        val count = IntArray(1)
+        var changed = false
+        val classes = dex.classes.map { clazz ->
+            val patched = replaceStringsInClass(clazz, replacements, count)
+            if (patched !== clazz) changed = true
+            patched
+        }
+        if (!changed || count[0] == 0) return 0
+        writeDexWithRepair(inputDex, outputDex, dex.opcodes, classes)
+        return count[0]
+    }
+
+    private fun replaceStringsInClass(
+        clazz: org.jf.dexlib2.iface.ClassDef,
+        replacements: Map<String, String>,
+        count: IntArray
+    ): org.jf.dexlib2.iface.ClassDef {
+        val fields = clazz.fields.map { field ->
+            val value = field.initialValue
+            if (value is StringEncodedValue) {
+                val replacement = replacements[value.value]
+                if (replacement != null && replacement != value.value) {
+                    count[0]++
+                    ImmutableField(
+                        field.definingClass,
+                        field.name,
+                        field.type,
+                        field.accessFlags,
+                        ImmutableStringEncodedValue(replacement),
+                        field.annotations,
+                        field.hiddenApiRestrictions
+                    )
+                } else {
+                    field
+                }
+            } else {
+                field
+            }
+        }
+
+        val methods = clazz.methods.map { method ->
+            val impl = method.implementation ?: return@map method
+            var methodChanged = false
+            val instructions = impl.instructions.map { instruction ->
+                if (instruction.opcode == Opcode.CONST_STRING ||
+                    instruction.opcode == Opcode.CONST_STRING_JUMBO
+                ) {
+                    val reference = (instruction as? ReferenceInstruction)?.reference
+                    if (reference is StringReference) {
+                        val replacement = replacements[reference.string]
+                        if (replacement != null && replacement != reference.string) {
+                            methodChanged = true
+                            count[0]++
+                            createConstStringInstruction(instruction, replacement)
+                        } else {
+                            instruction
+                        }
+                    } else {
+                        instruction
+                    }
+                } else {
+                    instruction
+                }
+            }
+            if (!methodChanged) return@map method
+            val impl2 = ImmutableMethodImplementation(
+                impl.registerCount,
+                instructions,
+                impl.tryBlocks,
+                impl.debugItems
+            )
+            ImmutableMethod(
+                method.definingClass,
+                method.name,
+                method.parameters,
+                method.returnType,
+                method.accessFlags,
+                method.annotations,
+                method.hiddenApiRestrictions,
+                impl2
+            )
+        }
+
+        if (fields == clazz.fields.toList() && methods == clazz.methods.toList()) return clazz
+        return ImmutableClassDef(
+            clazz.type,
+            clazz.accessFlags,
+            clazz.superclass,
+            clazz.interfaces,
+            clazz.sourceFile,
+            clazz.annotations,
+            fields,
+            methods
+        )
     }
 }

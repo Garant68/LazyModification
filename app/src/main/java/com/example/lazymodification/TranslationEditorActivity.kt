@@ -22,6 +22,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.lazymodification.utils.AppTranslator
+import com.example.lazymodification.utils.DexStringExtractor
 import com.example.lazymodification.utils.FileSaver
 import com.example.lazymodification.utils.MtDictionary
 import com.example.lazymodification.utils.TranslationCache
@@ -41,6 +42,7 @@ class TranslationEditorActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_APK_PATH = "com.example.lazymodification.EDITOR_APK_PATH"
         const val EXTRA_TARGET_LANGUAGE = "com.example.lazymodification.EDITOR_TARGET_LANGUAGE"
+        const val EXTRA_TRANSLATE_DEX = "com.example.lazymodification.EDITOR_TRANSLATE_DEX"
         const val EXTRA_PROVIDER = "com.example.lazymodification.EDITOR_PROVIDER"
         const val EXTRA_AZURE_KEY = "com.example.lazymodification.EDITOR_AZURE_KEY"
         const val EXTRA_AZURE_REGION = "com.example.lazymodification.EDITOR_AZURE_REGION"
@@ -52,6 +54,7 @@ class TranslationEditorActivity : AppCompatActivity() {
         const val EXTRA_ORIGINALS = "com.example.lazymodification.EDITOR_ORIGINALS"
         const val EXTRA_TRANSLATIONS = "com.example.lazymodification.EDITOR_TRANSLATIONS"
         const val EXTRA_EXCLUDED = "com.example.lazymodification.EDITOR_EXCLUDED"
+        const val EXTRA_DEX_FLAGS = "com.example.lazymodification.EDITOR_DEX_FLAGS"
         const val EXTRA_ACTION = "com.example.lazymodification.EDITOR_ACTION"
 
         const val ACTION_APPLY = "apply_translations"
@@ -65,7 +68,8 @@ class TranslationEditorActivity : AppCompatActivity() {
         val original: String,
         var translated: String,
         var excluded: Boolean = false,
-        var copiedOriginal: Boolean = false
+        var copiedOriginal: Boolean = false,
+        val isDex: Boolean = false
     )
 
     private val rows = mutableListOf<Row>()
@@ -305,6 +309,7 @@ class TranslationEditorActivity : AppCompatActivity() {
 
     private fun loadStrings() {
         val path = apkPath ?: return
+        val translateDex = intent.getBooleanExtra(EXTRA_TRANSLATE_DEX, false)
         keepScreenOn(true)
         progress.visibility = View.VISIBLE
         progress.isIndeterminate = true
@@ -337,6 +342,15 @@ class TranslationEditorActivity : AppCompatActivity() {
                     }
                 } finally {
                     module.close()
+                }
+                if (translateDex) {
+                    val existing = loaded.mapTo(HashSet()) { it.original }
+                    for (text in DexStringExtractor.collect(File(path), existing)) {
+                        val prefill = dictionary?.get(text)
+                            ?.takeIf { it.isNotBlank() && it != text }
+                            ?: ""
+                        loaded.add(Row(0, "", text, prefill, isDex = true))
+                    }
                 }
                 if (loaded.isEmpty()) throw IllegalStateException(getString(R.string.err_translate_empty))
                 runOnUiThread {
@@ -657,6 +671,7 @@ class TranslationEditorActivity : AppCompatActivity() {
         val data = Intent().apply {
             putExtra(EXTRA_IDS, rows.map { it.resourceId }.toIntArray())
             putExtra(EXTRA_EXCLUDED, rows.map { it.excluded }.toBooleanArray())
+            putExtra(EXTRA_DEX_FLAGS, rows.map { it.isDex }.toBooleanArray())
             putStringArrayListExtra(EXTRA_NAMES, ArrayList(rows.map { it.name }))
             putStringArrayListExtra(EXTRA_ORIGINALS, ArrayList(rows.map { it.original }))
             // Exclusion only skips automatic translation. A filled value

@@ -778,6 +778,7 @@
     <string name="mode_fast">Бърз превод</string>
 
     <string name="mode_full">Пълен превод</string>
+    <string name="translate_dex">Превод на DEX</string>
 
     <string name="fast_strings_hint">Низове за превод, разделени със запетая</string>
 
