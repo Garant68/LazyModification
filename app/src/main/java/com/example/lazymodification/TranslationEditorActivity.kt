@@ -324,9 +324,11 @@ class TranslationEditorActivity : AppCompatActivity() {
                 val dictionary = readDictionary()
                 val loaded = mutableListOf<Row>()
                 val seenIds = HashSet<Int>()
+                var packageName: String? = null
                 if (!dexOnly) {
                     val module = ApkModule.loadApkFile(File(path))
                     try {
+                        packageName = module.packageName
                         for (pkg in module.tableBlock.listPackages()) {
                             val strings = pkg.getResources("string")
                             while (strings.hasNext()) {
@@ -346,10 +348,17 @@ class TranslationEditorActivity : AppCompatActivity() {
                     } finally {
                         module.close()
                     }
+                } else {
+                    val module = ApkModule.loadApkFile(File(path))
+                    try {
+                        packageName = module.packageName
+                    } finally {
+                        module.close()
+                    }
                 }
                 if (translateDex) {
                     val existing = loaded.mapTo(HashSet()) { it.original }
-                    for (text in DexStringExtractor.collect(File(path), existing)) {
+                    for (text in DexStringExtractor.collect(File(path), existing, packageName)) {
                         val prefill = dictionary?.get(text)
                             ?.takeIf { it.isNotBlank() && it != text }
                             ?: ""
