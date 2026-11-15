@@ -452,6 +452,7 @@ class TranslateAppActivity : AppCompatActivity() {
             putExtra(TranslationEditorActivity.EXTRA_APK_PATH, apkPath)
             putExtra(TranslationEditorActivity.EXTRA_TARGET_LANGUAGE, targetLanguage)
             putExtra(TranslationEditorActivity.EXTRA_TRANSLATE_DEX, rbTranslateDex.isChecked)
+            putExtra(TranslationEditorActivity.EXTRA_DEX_ONLY, rbTranslateDex.isChecked)
             putExtra(TranslationEditorActivity.EXTRA_PROVIDER, provider)
             putExtra(TranslationEditorActivity.EXTRA_AZURE_KEY, etAzureKey.text.toString().trim())
             putExtra(TranslationEditorActivity.EXTRA_AZURE_REGION, etAzureRegion.text.toString().trim())
@@ -883,50 +884,56 @@ class TranslateAppActivity : AppCompatActivity() {
         Thread {
             var notFound: List<String> = emptyList()
             try {
-                var work = File(cacheDir, "translate_${System.currentTimeMillis()}.apk")
-                val module = ApkModule.loadApkFile(File(apkPath!!))
-                try {
-                    // Rows without a translation must not blank out the
-                    // original string. The editor can create a dictionary
-                    // from a partially filled list as well.
-                    val byId = rows
-                        .filter { !it.isDex && it.resourceId != 0 && it.translated.isNotBlank() }
-                        .associateBy { it.resourceId }
-                    val byValue = rows
-                        .filter { !it.isDex && it.resourceId == 0 && it.translated.isNotBlank() }
-                        .associateBy { it.original }
-                    val matchedValues = mutableSetOf<String>()
-                    val targetConfig = ResConfig.parse(target)
-                    for (pkg in module.tableBlock.listPackages()) {
-                        val strings = pkg.getResources("string")
-                        while (strings.hasNext()) {
-                            val e = strings.next()
-                            if (byId.isNotEmpty()) {
-                                val row = byId[e.getResourceId()]
-                                if (row != null) {
+                var work: File
+                if (rows.any { !it.isDex }) {
+                    work = File(cacheDir, "translate_${System.currentTimeMillis()}.apk")
+                    val module = ApkModule.loadApkFile(File(apkPath!!))
+                    try {
+                        // Rows without a translation must not blank out the
+                        // original string. The editor can create a dictionary
+                        // from a partially filled list as well.
+                        val byId = rows
+                            .filter { !it.isDex && it.resourceId != 0 && it.translated.isNotBlank() }
+                            .associateBy { it.resourceId }
+                        val byValue = rows
+                            .filter { !it.isDex && it.resourceId == 0 && it.translated.isNotBlank() }
+                            .associateBy { it.original }
+                        val matchedValues = mutableSetOf<String>()
+                        val targetConfig = ResConfig.parse(target)
+                        for (pkg in module.tableBlock.listPackages()) {
+                            val strings = pkg.getResources("string")
+                            while (strings.hasNext()) {
+                                val e = strings.next()
+                                if (byId.isNotEmpty()) {
+                                    val row = byId[e.getResourceId()]
+                                    if (row != null) {
+                                        if (row.excluded || row.translated != row.original) {
+                                            e.getOrCreate(targetConfig).setValueAsString(row.translated)
+                                        }
+                                        continue
+                                    }
+                                }
+                                if (byValue.isNotEmpty()) {
+                                    val def = e.get(ResConfig.getDefault()) ?: e.get() ?: continue
+                                    if (def.isNull()) continue
+                                    val v = def.getValueAsString() ?: continue
+                                    val row = byValue[v] ?: continue
+                                    matchedValues.add(v)
                                     if (row.excluded || row.translated != row.original) {
                                         e.getOrCreate(targetConfig).setValueAsString(row.translated)
                                     }
-                                    continue
-                                }
-                            }
-                            if (byValue.isNotEmpty()) {
-                                val def = e.get(ResConfig.getDefault()) ?: e.get() ?: continue
-                                if (def.isNull()) continue
-                                val v = def.getValueAsString() ?: continue
-                                val row = byValue[v] ?: continue
-                                matchedValues.add(v)
-                                if (row.excluded || row.translated != row.original) {
-                                    e.getOrCreate(targetConfig).setValueAsString(row.translated)
                                 }
                             }
                         }
+                        notFound = byValue.keys.filter { it !in matchedValues }
+                        if (work.exists()) work.delete()
+                        module.writeApk(work)
+                    } finally {
+                        module.close()
                     }
-                    notFound = byValue.keys.filter { it !in matchedValues }
-                    if (work.exists()) work.delete()
-                    module.writeApk(work)
-                } finally {
-                    module.close()
+                } else {
+                    work = File(cacheDir, "translate_dex_input_${System.currentTimeMillis()}.apk")
+                    File(apkPath!!).copyTo(work, overwrite = true)
                 }
 
                 val dexTranslations = rows

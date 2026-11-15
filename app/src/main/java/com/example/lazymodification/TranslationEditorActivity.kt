@@ -43,6 +43,7 @@ class TranslationEditorActivity : AppCompatActivity() {
         const val EXTRA_APK_PATH = "com.example.lazymodification.EDITOR_APK_PATH"
         const val EXTRA_TARGET_LANGUAGE = "com.example.lazymodification.EDITOR_TARGET_LANGUAGE"
         const val EXTRA_TRANSLATE_DEX = "com.example.lazymodification.EDITOR_TRANSLATE_DEX"
+        const val EXTRA_DEX_ONLY = "com.example.lazymodification.EDITOR_DEX_ONLY"
         const val EXTRA_PROVIDER = "com.example.lazymodification.EDITOR_PROVIDER"
         const val EXTRA_AZURE_KEY = "com.example.lazymodification.EDITOR_AZURE_KEY"
         const val EXTRA_AZURE_REGION = "com.example.lazymodification.EDITOR_AZURE_REGION"
@@ -309,7 +310,8 @@ class TranslationEditorActivity : AppCompatActivity() {
 
     private fun loadStrings() {
         val path = apkPath ?: return
-        val translateDex = intent.getBooleanExtra(EXTRA_TRANSLATE_DEX, false)
+        val dexOnly = intent.getBooleanExtra(EXTRA_DEX_ONLY, false)
+        val translateDex = dexOnly || intent.getBooleanExtra(EXTRA_TRANSLATE_DEX, false)
         keepScreenOn(true)
         progress.visibility = View.VISIBLE
         progress.isIndeterminate = true
@@ -322,26 +324,28 @@ class TranslationEditorActivity : AppCompatActivity() {
                 val dictionary = readDictionary()
                 val loaded = mutableListOf<Row>()
                 val seenIds = HashSet<Int>()
-                val module = ApkModule.loadApkFile(File(path))
-                try {
-                    for (pkg in module.tableBlock.listPackages()) {
-                        val strings = pkg.getResources("string")
-                        while (strings.hasNext()) {
-                            val entry = strings.next()
-                            val value = entry.get(ResConfig.getDefault()) ?: entry.get() ?: continue
-                            if (value.isNull()) continue
-                            val text = value.getValueAsString() ?: continue
-                            if (!TranslationRules.isTranslatable(entry.getName(), text)) continue
-                            val id = entry.getResourceId()
-                            if (id != 0 && !seenIds.add(id)) continue
-                            val prefill = dictionary?.get(text)
-                                ?.takeIf { it.isNotBlank() && it != text }
-                                ?: ""
-                            loaded.add(Row(id, entry.getName() ?: "", text, prefill))
+                if (!dexOnly) {
+                    val module = ApkModule.loadApkFile(File(path))
+                    try {
+                        for (pkg in module.tableBlock.listPackages()) {
+                            val strings = pkg.getResources("string")
+                            while (strings.hasNext()) {
+                                val entry = strings.next()
+                                val value = entry.get(ResConfig.getDefault()) ?: entry.get() ?: continue
+                                if (value.isNull()) continue
+                                val text = value.getValueAsString() ?: continue
+                                if (!TranslationRules.isTranslatable(entry.getName(), text)) continue
+                                val id = entry.getResourceId()
+                                if (id != 0 && !seenIds.add(id)) continue
+                                val prefill = dictionary?.get(text)
+                                    ?.takeIf { it.isNotBlank() && it != text }
+                                    ?: ""
+                                loaded.add(Row(id, entry.getName() ?: "", text, prefill))
+                            }
                         }
+                    } finally {
+                        module.close()
                     }
-                } finally {
-                    module.close()
                 }
                 if (translateDex) {
                     val existing = loaded.mapTo(HashSet()) { it.original }
